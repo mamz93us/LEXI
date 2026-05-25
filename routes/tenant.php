@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Livewire\Calendar\Index as CalendarIndex;
+use App\Livewire\Cases\Detail as CaseDetail;
 use App\Livewire\Cases\Form as CaseForm;
 use App\Livewire\Cases\Index as CasesIndex;
 use App\Livewire\Clients\Form as ClientForm;
@@ -39,7 +41,10 @@ Route::middleware([
 
         Route::get('cases', CasesIndex::class)->name('cases.index');
         Route::get('cases/new', CaseForm::class)->name('cases.create');
+        Route::get('cases/{case}', CaseDetail::class)->name('cases.show');
         Route::get('cases/{case}/edit', CaseForm::class)->name('cases.edit');
+
+        Route::get('calendar', CalendarIndex::class)->name('calendar.index');
     });
 
     require __DIR__.'/auth.php';
