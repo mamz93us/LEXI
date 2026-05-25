@@ -1,0 +1,68 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: lexa-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-lexa}
+      POSTGRES_USER: ${DB_USERNAME:-lexa}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-lexa}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - lexa_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-lexa} -d ${DB_DATABASE:-lexa}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: lexa-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - lexa_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.11
+    container_name: lexa-meilisearch
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: ${MEILISEARCH_KEY:-lexa-dev-master-key}
+      MEILI_ENV: development
+    ports:
+      - "${MEILISEARCH_PORT:-7700}:7700"
+    volumes:
+      - lexa_meilisearch:/meili_data
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--spider", "http://127.0.0.1:7700/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Phase 2 placeholders -- uncomment when document/AI pipeline lands.
+  # soffice:
+  #   image: linuxserver/libreoffice:latest
+  #   container_name: lexa-soffice
+  #   restart: unless-stopped
+  #   command: ["soffice", "--headless", "--accept=socket,host=0.0.0.0,port=2002;urp;"]
+  #
+  # tesseract:
+  #   image: hertzg/tesseract-server:latest
+  #   container_name: lexa-tesseract
+  #   restart: unless-stopped
+  #   environment:
+  #     TESSERACT_LANGS: ara+eng
+
+volumes:
+  lexa_postgres:
+  lexa_redis:
+  lexa_meilisearch:
