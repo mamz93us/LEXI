@@ -1,66 +1,63 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# LEXA
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Multi-tenant, Arabic-first SaaS for Egyptian law firms. Litigation
+management, corporate / formation work, government paperwork, document
+automation, and a RAG-powered Arabic contract drafter that learns from
+each firm's own archive.
 
-## About Laravel
+> **Read [`CLAUDE.md`](CLAUDE.md) first.** It is the source of truth for
+> scope, conventions, and constraints. See [`docs/DECISIONS.md`](docs/DECISIONS.md)
+> for every architectural choice and the live gap log.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Status
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Phases 1–4 have foundations in place. **47 Pest tests passing, 109
+assertions.** Pint clean.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- ✅ M1.1 — Tenancy, Arabic RTL shell, auth, Clients & Cases CRUD
+- ✅ M1.2 — Egyptian litigation core (courts / case types / hearings +
+  الطلبات / judgments + auto-deadline engine + chain viewer + calendar)
+- ✅ Phase 2 — Documents schema, ArabicNormalizer + LegalChunker, RAG
+  retrieval service with hard SQL tenant filter, embedding-driver
+  interface, Anthropic client wrapper, document generator (DOCX),
+  review workflow, proxies module
+- ✅ Phase 3 — Corporate (companies, formation steps, shareholders,
+  compliance, serials, IP assets)
+- ✅ Phase 4 — Time tracking, invoicing (piastres, 14% VAT), payments,
+  dashboard with stat tiles
+- ⏸ Live AI / OCR / PDF / billing / lawyer-verified deadlines — each
+  blocked by a specific credential or domain decision documented in
+  [`docs/DECISIONS.md`](docs/DECISIONS.md)
 
-## Learning Laravel
+## Quick start
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+See [`docs/SETUP.md`](docs/SETUP.md) for the full walkthrough.
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+```powershell
+docker compose up -d        # postgres+pgvector, redis, meilisearch
+composer install
+npm install && npm run build
+cp .env.example .env
+php artisan key:generate
+php artisan migrate --seed
+php artisan serve
+```
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Add to `C:\Windows\System32\drivers\etc\hosts`:
+```
+127.0.0.1  lexa.test samir.lexa.test demo.lexa.test
+```
 
-## Laravel Sponsors
+Login at `http://samir.lexa.test:8000/login` as
+`partner@samir.test` / `lexa-dev`.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## Testing
 
-### Premium Partners
-
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
-
-## Contributing
-
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```powershell
+./vendor/bin/pest --no-coverage
+./vendor/bin/pint
+```
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Proprietary — SamirGroup / SSS.
