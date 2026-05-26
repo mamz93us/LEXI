@@ -67,7 +67,11 @@ return [
             'driver' => 'redis',
             'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
             'queue' => env('REDIS_QUEUE', 'default'),
-            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
+            // 400s default so the worker has time to finish a 280s Anthropic
+            // call before the queue assumes the job died and re-queues it.
+            // MUST be greater than RunAiGenerationJob::$timeout (320s) AND
+            // greater than the Horizon supervisor timeout in config/horizon.php.
+            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 400),
             'block_for' => null,
             'after_commit' => false,
         ],
