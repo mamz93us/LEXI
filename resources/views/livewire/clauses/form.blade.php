@@ -1,5 +1,5 @@
 <div class="py-8 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-3xl mx-auto bg-white shadow-sm rounded-lg p-6">
+    <div class="max-w-7xl mx-auto bg-white shadow-sm rounded-lg p-6">
         <h2 class="text-2xl font-semibold text-gray-900 mb-6">
             {{ $clause ? 'تعديل بند: '.$clause->title : 'بند جديد' }}
         </h2>
@@ -19,11 +19,20 @@
                 </div>
             </div>
 
-            <div>
-                <label class="block text-sm font-medium text-gray-700">نص البند (يُدرج حرفياً في العقد)</label>
-                <textarea wire:model="body" rows="12" dir="rtl"
-                          class="mt-1 w-full rounded-md border-gray-300 shadow-sm font-mono text-sm"></textarea>
-                @error('body') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+            <div class="grid grid-cols-1 lg:grid-cols-[1fr_18rem] gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">نص البند (يُدرج حرفياً في العقد)</label>
+                    <p class="text-xs text-gray-500 mb-1">
+                        يمكنك استخدام متغيرات مثل <code class="bg-gray-100 px-1 rounded">@{{seller.name}}</code> أو <code class="bg-gray-100 px-1 rounded">@{{court.name}}</code> — ستُملأ عند توليد العقد.
+                    </p>
+                    <textarea wire:model="body" rows="18" dir="rtl"
+                              class="mt-1 w-full rounded-md border-gray-300 shadow-sm font-mono text-sm leading-7"></textarea>
+                    @error('body') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <x-variable-chips target="body" />
+                </div>
             </div>
 
             <div class="flex items-center gap-6">

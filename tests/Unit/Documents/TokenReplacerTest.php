@@ -33,3 +33,25 @@ it('does not evaluate php-like expressions inside braces', function () {
         ->and($this->r->replace('{{ name + 1 }}', ['name' => 'x']))
         ->toBe('{{ name + 1 }}'); // not a valid identifier → left untouched
 });
+
+it('substitutes dotted tokens from a flat data map', function () {
+    $body = 'البائع: {{seller.name}} - رقمه القومي: {{seller.national_id}}';
+    expect($this->r->replace($body, [
+        'seller.name' => 'محمد علي',
+        'seller.national_id' => '29801011234567',
+    ]))->toBe('البائع: محمد علي - رقمه القومي: 29801011234567');
+});
+
+it('substitutes dotted tokens from a nested data map', function () {
+    $body = 'المشتري: {{buyer.name}} في {{contract.place}}';
+    expect($this->r->replace($body, [
+        'buyer' => ['name' => 'أحمد'],
+        'contract' => ['place' => 'القاهرة'],
+    ]))->toBe('المشتري: أحمد في القاهرة');
+});
+
+it('reports an unfilled dotted token if neither flat nor nested form has it', function () {
+    $body = 'البائع: {{seller.name}} والمشتري: {{buyer.name}}';
+    expect($this->r->unfilled($body, ['seller.name' => 'محمد']))
+        ->toBe(['buyer.name']);
+});

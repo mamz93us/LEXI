@@ -6,23 +6,30 @@ namespace App\Services\Rag;
 
 use App\Models\ClauseVersion;
 use App\Models\TemplateVersion;
+use App\Services\Documents\TokenReplacer;
 use Illuminate\Support\Collection;
 
 /**
  * Combine the four sources for an Arabic legal drafting prompt:
  *   1. SYSTEM — role, tone, hard rules (no fabricated articles/citations)
  *   2. TEMPLATE — the firm's vetted contract template (the BASE the AI
- *      must work from). The AI fills tokens and completes blanks; it
- *      MUST NOT replace the template's structure or wording.
+ *      must work from). Predefined-catalog tokens (`{{seller.name}}`,
+ *      `{{contract.place}}`, etc.) are pre-substituted on our side so
+ *      Claude never has to guess at party data — it sees real values.
+ *      Only genuine "...." style blanks or true narrative gaps are left
+ *      for the AI to complete.
  *   3. REFERENCE — retrieved RAG chunks so the AI matches the firm's voice
  *   4. CLAUSES — verbatim approved boilerplate from the clause library
- *   5. DATA — structured form answers
+ *      (also pre-substituted so embedded {{party}} tokens resolve)
+ *   5. DATA — structured form answers (kept for transparency)
  *
  * The system prompt explicitly forbids inventing statute references and
  * forbids replacing the template's body — see CLAUDE.md §6.3.
  */
 final class PromptAssembler
 {
+    public function __construct(private readonly TokenReplacer $tokens) {}
+
     /**
      * @param  Collection<int, array>  $retrievedChunks
      * @param  Collection<int, ClauseVersion>  $verbatimClauses
@@ -40,7 +47,7 @@ final class PromptAssembler
 أنت مساعد صياغة قانوني مصري متخصص. تكتب بأسلوب العربية الفصحى القانونية الواضحة والدقيقة. التزم بالقواعد الآتية حرفياً:
 
 1. القالب (TEMPLATE) المرفق هو الأساس الذي تبني عليه المسودة. حافظ على ترتيبه وبنوده وصياغته الأصلية كما هي قدر الإمكان. اقتصر على:
-   (أ) استبدال العلامات النائبة `{{token_name}}` بالقيم الواردة في قسم DATA.
+   (أ) استبدال العلامات النائبة المتبقية `{{token_name}}` بالقيم الواردة في قسم DATA (معظمها تم استبداله مسبقاً، لكن قد تتبقى بعض العلامات).
    (ب) إكمال الفراغات الواضحة مثل `..............` أو `_______` بمعطيات من DATA.
    (ج) تصحيح الأخطاء الإملائية في الفقرات المتغيرة فقط، لا في البنود القانونية الجوهرية.
    لا تعد كتابة العقد من جديد، لا تختصره، لا تختلق بنوداً غير موجودة في القالب.
@@ -56,8 +63,16 @@ final class PromptAssembler
 6. كل ناتج مولّد آلياً يُعرض على محامٍ للمراجعة قبل الاعتماد.
 TXT;
 
-        $templateBlock = $template?->body
-            ? "TEMPLATE — قالب المكتب المعتمد. ابنِ المسودة عليه:\n```\n{$template->body}\n```\n"
+        // Pre-substitute predefined-catalog tokens directly into the template
+        // body — `{{seller.name}}` → the actual name. What remains in the
+        // body is either a truly-unfilled token (intentional, leave for review)
+        // or `..........` style blanks that Claude can fill from DATA.
+        $resolvedBody = $template?->body
+            ? $this->tokens->replace($template->body, $filledData)
+            : null;
+
+        $templateBlock = $resolvedBody
+            ? "TEMPLATE — قالب المكتب المعتمد. ابنِ المسودة عليه:\n```\n{$resolvedBody}\n```\n"
             : '';
 
         $reference = $retrievedChunks
@@ -67,8 +82,14 @@ TXT;
             ? "REFERENCE — مقاطع من عقود سابقة للمكتب، للأسلوب فقط:\n{$reference}\n"
             : '';
 
+        // Resolve tokens inside clause bodies too — they may reference
+        // {{seller.name}} or {{court.name}}.
         $clauses = $verbatimClauses
-            ->map(fn (ClauseVersion $cv, int $i) => '--- بند #'.($i + 1)."\n".$cv->body)
+            ->map(function (ClauseVersion $cv, int $i) use ($filledData) {
+                $body = $this->tokens->replace($cv->body, $filledData);
+
+                return '--- بند #'.($i + 1)."\n".$body;
+            })
             ->implode("\n\n");
         $clausesBlock = $clauses !== ''
             ? "CLAUSES — بنود معتمدة، أدرجها حرفياً في موقعها المناسب:\n{$clauses}\n"
@@ -79,8 +100,8 @@ TXT;
             ->map(fn ($v, $k) => "- {$k}: ".(is_scalar($v) ? (string) $v : json_encode($v, JSON_UNESCAPED_UNICODE)))
             ->implode("\n");
         $dataBlock = $data !== ''
-            ? "DATA — قيم الحقول التي ملأها المحامي:\n{$data}\n"
-            : "DATA — (المحامي لم يملأ حقولاً بعد. أبقِ العلامات النائبة كما هي حتى تُملأ.)\n";
+            ? "DATA — قيم الحقول المعبأة (للمرجع — معظمها مُدمج بالفعل في TEMPLATE):\n{$data}\n"
+            : "DATA — (لم تُملأ حقول. أبقِ العلامات النائبة كما هي حتى تُملأ.)\n";
 
         $userMessage = "المهمة: {$userIntent}\n\n{$templateBlock}\n{$referenceBlock}\n{$clausesBlock}\n{$dataBlock}\nأخرج النص الكامل للعقد جاهزاً للمراجعة من محامٍ. لا تضف عنواناً تمهيدياً ولا تعليقات شارحة، فقط نص العقد.";
 

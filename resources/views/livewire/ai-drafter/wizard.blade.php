@@ -1,11 +1,11 @@
 <div class="py-8 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-4xl mx-auto space-y-6">
+    <div class="max-w-5xl mx-auto space-y-6">
         <h2 class="text-2xl font-semibold text-gray-900">مسودة آلية جديدة</h2>
 
         <div class="flex items-center gap-2 text-sm">
             <span class="px-2 py-1 rounded {{ $step >= 1 ? 'bg-lexa-600 text-white' : 'bg-gray-200' }}">1. القالب</span>
             <span class="text-gray-400">›</span>
-            <span class="px-2 py-1 rounded {{ $step >= 2 ? 'bg-lexa-600 text-white' : 'bg-gray-200' }}">2. البيانات</span>
+            <span class="px-2 py-1 rounded {{ $step >= 2 ? 'bg-lexa-600 text-white' : 'bg-gray-200' }}">2. الأطراف والبيانات</span>
             <span class="text-gray-400">›</span>
             <span class="px-2 py-1 rounded {{ $step >= 3 ? 'bg-lexa-600 text-white' : 'bg-gray-200' }}">3. البنود</span>
             <span class="text-gray-400">›</span>
@@ -13,6 +13,7 @@
         </div>
 
         <div class="bg-white shadow-sm rounded-lg p-6">
+            {{-- ===================== STEP 1 ===================== --}}
             @if ($step === 1)
                 <h3 class="font-semibold mb-4">اختر قالباً</h3>
                 @if ($this->activeTemplates->isEmpty())
@@ -46,36 +47,129 @@
                 </div>
             @endif
 
+            {{-- ===================== STEP 2 ===================== --}}
             @if ($step === 2)
-                <h3 class="font-semibold mb-4">املأ بيانات القالب</h3>
-                @if (empty($this->templateVariables))
-                    <p class="text-sm text-gray-500">هذا القالب لا يحتوي متغيرات قابلة للتعبئة.</p>
-                @else
-                    <div class="space-y-4">
-                        @foreach ($this->templateVariables as $var)
+                <h3 class="font-semibold mb-1">الأطراف وبيانات العقد</h3>
+                <p class="text-sm text-gray-500 mb-5">
+                    اختر العملاء كأطراف للعقد — سيتم تعبئة جميع بياناتهم (الاسم، الرقم القومي، العنوان، الجنسية، الديانة، المهنة …) تلقائياً.
+                </p>
+
+                {{-- Party pickers --}}
+                @if (! empty($this->detectedParties))
+                    <div class="space-y-4 mb-6">
+                        <h4 class="text-sm font-semibold text-gray-900 border-b pb-1">الأطراف</h4>
+                        @foreach ($this->detectedParties as $ns)
                             @php
-                                $name = $var['name'] ?? '';
-                                $label = $var['label_ar'] ?? ($var['label_en'] ?? $name);
-                                $type = $var['type'] ?? 'text';
-                                $required = $var['required'] ?? false;
+                                $label = $this->partyLabels[$ns] ?? $ns;
+                                $selectedId = $parties[$ns] ?? null;
+                                $selected = $selectedId ? $this->clientsList->firstWhere('id', (int) $selectedId) : null;
                             @endphp
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">
-                                    {{ $label }} @if ($required) <span class="text-red-500">*</span> @endif
+                            <div class="border rounded-md p-3 bg-gray-50">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                    {{ $label }} <span class="text-xs text-gray-500">(@{{ {{ $ns }}.* @})</span>
                                 </label>
-                                @if ($type === 'textarea')
-                                    <textarea wire:model="filled.{{ $name }}" rows="3"
-                                              class="mt-1 w-full rounded-md border-gray-300 shadow-sm"></textarea>
-                                @else
-                                    <input wire:model="filled.{{ $name }}" type="{{ $type === 'number' ? 'number' : 'text' }}"
-                                           class="mt-1 w-full rounded-md border-gray-300 shadow-sm" />
+                                <select wire:model.live="parties.{{ $ns }}"
+                                        class="w-full rounded-md border-gray-300 shadow-sm">
+                                    <option value="">— اختر عميلاً —</option>
+                                    @foreach ($this->clientsList as $cl)
+                                        <option value="{{ $cl->id }}">
+                                            {{ $cl->name_ar ?: $cl->name }}@if ($cl->national_id) — {{ $cl->national_id }} @endif
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @if ($selected)
+                                    <div class="mt-2 text-xs text-gray-600 space-y-0.5">
+                                        @if ($selected->national_id) <div>الرقم القومي: <code>{{ $selected->national_id }}</code></div> @endif
+                                        @if ($selected->type === 'company') <div class="text-amber-700">نوع العميل: شركة</div> @endif
+                                        <a href="{{ route('clients.edit', $selected->id) }}" target="_blank"
+                                           class="text-lexa-700 hover:underline">عرض/تعديل بيانات العميل ↗</a>
+                                    </div>
                                 @endif
                             </div>
                         @endforeach
                     </div>
                 @endif
 
-                <div class="mt-6">
+                {{-- Contract metadata fields --}}
+                @if (! empty($this->detectedContractMeta))
+                    <div class="space-y-4 mb-6">
+                        <h4 class="text-sm font-semibold text-gray-900 border-b pb-1">بيانات العقد</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            @foreach ($this->detectedContractMeta as $token)
+                                @php $def = $this->metaFieldDefs[$token] ?? ['label_ar' => $token, 'type' => 'text']; @endphp
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">
+                                        {{ $def['label_ar'] }} <span class="text-xs text-gray-500">(@{{ {{ $token }} @})</span>
+                                    </label>
+                                    @if (($def['source'] ?? null) === 'courts')
+                                        <select wire:model="contract_meta.{{ $token }}"
+                                                class="mt-1 w-full rounded-md border-gray-300 shadow-sm">
+                                            <option value="">— اختر المحكمة —</option>
+                                            @foreach ($this->courtsList as $crt)
+                                                <option value="{{ $crt->id }}">
+                                                    {{ $crt->name_ar ?: $crt->name_en }}@if ($crt->governorate) — {{ $crt->governorate }} @endif
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    @elseif ($def['type'] === 'textarea')
+                                        <textarea wire:model="contract_meta.{{ $token }}" rows="2"
+                                                  class="mt-1 w-full rounded-md border-gray-300 shadow-sm"></textarea>
+                                    @elseif ($def['type'] === 'date')
+                                        <input wire:model="contract_meta.{{ $token }}" type="date"
+                                               class="mt-1 w-full rounded-md border-gray-300 shadow-sm" />
+                                    @else
+                                        <input wire:model="contract_meta.{{ $token }}" type="text"
+                                               class="mt-1 w-full rounded-md border-gray-300 shadow-sm" />
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                {{-- Custom (non-catalog) variables, if the template defines any --}}
+                @if (! empty($this->templateCustomVariables))
+                    <div class="space-y-4 mb-6">
+                        <h4 class="text-sm font-semibold text-gray-900 border-b pb-1">حقول إضافية</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            @foreach ($this->templateCustomVariables as $var)
+                                @php
+                                    $name = $var['name'] ?? '';
+                                    $label = $var['label_ar'] ?? ($var['label_en'] ?? $name);
+                                    $type = $var['type'] ?? 'text';
+                                    $required = $var['required'] ?? false;
+                                @endphp
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">
+                                        {{ $label }} @if ($required) <span class="text-red-500">*</span> @endif
+                                    </label>
+                                    @if ($type === 'textarea')
+                                        <textarea wire:model="filled.{{ $name }}" rows="2"
+                                                  class="mt-1 w-full rounded-md border-gray-300 shadow-sm"></textarea>
+                                    @else
+                                        <input wire:model="filled.{{ $name }}" type="{{ $type === 'number' ? 'number' : 'text' }}"
+                                               class="mt-1 w-full rounded-md border-gray-300 shadow-sm" />
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                @if (empty($this->detectedParties) && empty($this->detectedContractMeta) && empty($this->templateCustomVariables))
+                    <div class="bg-amber-50 border-s-4 border-amber-400 p-3 mb-4">
+                        <p class="text-sm text-amber-800">
+                            القالب لا يحتوي على أي متغيرات قابلة للتعبئة. اضغط «التالي» للمتابعة وسيُولّد العقد كما هو.
+                        </p>
+                        <p class="text-xs text-amber-700 mt-1">
+                            لإضافة متغيرات (مثل البائع، المشتري، مكان العقد …) ارجع إلى
+                            <a href="{{ route('templates.edit', $this->template) }}" wire:navigate class="text-lexa-700 hover:underline">صفحة القالب</a>
+                            واستخدم قائمة المتغيرات الجاهزة.
+                        </p>
+                    </div>
+                @endif
+
+                <div>
                     <label class="block text-sm font-medium text-gray-700">تعليمات إضافية للمساعد (اختياري)</label>
                     <textarea wire:model="user_intent" rows="3" dir="rtl"
                               placeholder="مثال: استخدم نبرة رسمية، أضف بند التحكيم في القاهرة، …"
@@ -83,6 +177,7 @@
                 </div>
             @endif
 
+            {{-- ===================== STEP 3 ===================== --}}
             @if ($step === 3)
                 <h3 class="font-semibold mb-4">اختر البنود التي ستُدرج حرفياً</h3>
                 @if ($this->approvedClauses->isEmpty())
@@ -108,11 +203,12 @@
                 @endif
             @endif
 
+            {{-- ===================== STEP 4 ===================== --}}
             @if ($step === 4)
                 <h3 class="font-semibold mb-4">توليد المسودة</h3>
                 @if ($output === null && $error === null)
                     <div class="space-y-3">
-                        <p class="text-sm text-gray-600">سيتم استدعاء Claude مع: القالب المختار + المتغيرات المعبأة + البنود المعتمدة المختارة + سياق الاسترجاع من أرشيف العقود.</p>
+                        <p class="text-sm text-gray-600">سيتم استبدال جميع المتغيرات في القالب ببيانات الأطراف، ثم سيُرسل القالب لـ Claude مع البنود المعتمدة وسياق الاسترجاع من أرشيف العقود.</p>
                         <button wire:click="generate" wire:loading.attr="disabled"
                                 class="px-6 py-3 bg-lexa-600 hover:bg-lexa-700 text-white text-sm font-medium rounded-md disabled:opacity-50">
                             <span wire:loading.remove wire:target="generate">توليد المسودة</span>

@@ -1,5 +1,5 @@
 <div class="py-8 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-4xl mx-auto bg-white shadow-sm rounded-lg p-6">
+    <div class="max-w-7xl mx-auto bg-white shadow-sm rounded-lg p-6">
         <h2 class="text-2xl font-semibold text-gray-900 mb-6">
             {{ $template ? 'تعديل قالب: '.$template->title : 'قالب جديد' }}
         </h2>
@@ -28,24 +28,37 @@
                 <input wire:model="description" type="text" class="mt-1 w-full rounded-md border-gray-300 shadow-sm" />
             </div>
 
-            <div>
-                <label class="block text-sm font-medium text-gray-700">جسم القالب</label>
-                <p class="text-xs text-gray-500 mb-1">
-                    استخدم <code class="bg-gray-100 px-1 rounded">@{{token_name}}</code> للحقول التي ستملأ عند التوليد.
-                </p>
-                <textarea wire:model="body" rows="14"
-                          class="mt-1 w-full rounded-md border-gray-300 shadow-sm font-mono text-sm" dir="rtl"></textarea>
-                @error('body') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+            <div class="grid grid-cols-1 lg:grid-cols-[1fr_18rem] gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">جسم القالب</label>
+                    <p class="text-xs text-gray-500 mb-1">
+                        انقر على أي متغير من القائمة على اليسار لإدراجه في موضع المؤشر، أو اكتب يدوياً
+                        <code class="bg-gray-100 px-1 rounded">@{{seller.name}}</code> أو <code class="bg-gray-100 px-1 rounded">@{{contract.place}}</code>.
+                    </p>
+                    <textarea wire:model="body" rows="22"
+                              class="mt-1 w-full rounded-md border-gray-300 shadow-sm font-mono text-sm leading-7" dir="rtl"></textarea>
+                    @error('body') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <x-variable-chips target="body" />
+                </div>
             </div>
 
-            <div>
-                <label class="block text-sm font-medium text-gray-700">المتغيرات (JSON)</label>
-                <p class="text-xs text-gray-500 mb-1">مثال (انسخ والصق):</p>
-                <pre class="bg-gray-100 px-2 py-1 rounded text-xs overflow-x-auto" dir="ltr">[@{{"name":"party_a","label_ar":"الطرف الأول","type":"text","required":true@}}]</pre>
-                <textarea wire:model="variables_json" rows="6"
-                          class="mt-1 w-full rounded-md border-gray-300 shadow-sm font-mono text-xs"></textarea>
-                @error('variables_json') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-            </div>
+            <details class="border rounded-md">
+                <summary class="px-3 py-2 text-sm font-medium text-gray-700 cursor-pointer bg-gray-50">
+                    متغيرات إضافية مخصصة (JSON، اختياري)
+                </summary>
+                <div class="p-3">
+                    <p class="text-xs text-gray-500 mb-1">
+                        تُضاف هنا فقط الحقول الإضافية التي لا تغطيها قائمة المتغيرات الجاهزة. مثال:
+                    </p>
+                    <pre class="bg-gray-100 px-2 py-1 rounded text-xs overflow-x-auto" dir="ltr">[@{{"name":"property_address","label_ar":"عنوان العقار","type":"text","required":true@}}]</pre>
+                    <textarea wire:model="variables_json" rows="5"
+                              class="mt-1 w-full rounded-md border-gray-300 shadow-sm font-mono text-xs"></textarea>
+                    @error('variables_json') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                </div>
+            </details>
 
             <div class="flex items-center gap-2">
                 <input wire:model="is_active" type="checkbox" id="is_active" class="rounded border-gray-300" />

@@ -33,6 +33,14 @@ class Form extends Component
 
     public ?string $address = null;
 
+    public string $nationality = 'مصري';
+
+    public ?string $religion = null;
+
+    public ?string $profession = null;
+
+    public ?string $date_of_birth = null;
+
     public ?string $notes = null;
 
     public function mount(?Client $client = null): void
@@ -50,6 +58,10 @@ class Form extends Component
             $this->national_id = $client->national_id;
             $this->commercial_register_no = $client->commercial_register_no;
             $this->address = $client->address;
+            $this->nationality = $client->nationality ?: 'مصري';
+            $this->religion = $client->religion;
+            $this->profession = $client->profession;
+            $this->date_of_birth = $client->date_of_birth?->format('Y-m-d');
             $this->notes = $client->notes;
         } else {
             $this->authorize('create', Client::class);
@@ -68,6 +80,10 @@ class Form extends Component
             'national_id' => ['nullable', 'string', 'max:32'],
             'commercial_register_no' => ['nullable', 'string', 'max:64'],
             'address' => ['nullable', 'string', 'max:2000'],
+            'nationality' => ['nullable', 'string', 'max:64'],
+            'religion' => ['nullable', 'string', 'max:64'],
+            'profession' => ['nullable', 'string', 'max:128'],
+            'date_of_birth' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ];
     }
