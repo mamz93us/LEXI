@@ -132,9 +132,11 @@ class Wizard extends Component
                 userIntent: $intent,
                 filledData: $this->filled,
                 verbatimClauses: $clauseVersions,
+                template: $template->currentVersion,
             );
-            $this->output = $generation->output;
-            $this->generation_id = $generation->id;
+            // Land the lawyer on the new Detail page where they can review,
+            // refine with the AI, edit manually, and approve.
+            $this->redirectRoute('ai-drafter.show', $generation, navigate: true);
         } catch (Throwable $e) {
             // RagGenerator already persisted an AiGeneration row marked rejected.
             $this->error = $e->getMessage();

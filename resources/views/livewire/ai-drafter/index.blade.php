@@ -17,7 +17,8 @@
 
         <div class="space-y-3">
             @forelse ($this->generations as $g)
-                <div class="bg-white shadow-sm rounded-lg p-4">
+                <a href="{{ route('ai-drafter.show', $g) }}" wire:navigate
+                   class="block bg-white shadow-sm rounded-lg p-4 hover:shadow-md transition">
                     <div class="flex justify-between items-start mb-2">
                         <div>
                             <span class="text-xs px-2 py-1 rounded
@@ -26,19 +27,17 @@
                                 {{ in_array($g->status, ['draft', 'reviewed']) ? 'bg-amber-100 text-amber-800' : '' }}">
                                 {{ $g->status === 'draft' ? 'مسودة آلية — قيد المراجعة' : $g->status }}
                             </span>
+                            @if ($g->revision_kind && $g->revision_kind !== 'initial')
+                                <span class="text-xs px-2 py-1 rounded bg-lexa-50 text-lexa-700 ms-1">
+                                    {{ $g->revision_kind === 'ai_refine' ? 'تعديل آلي' : 'تعديل يدوي' }}
+                                </span>
+                            @endif
                             <span class="text-xs text-gray-500 ms-2">{{ $g->created_at?->format('Y-m-d H:i') }} · {{ $g->model }}</span>
                         </div>
-                        @if ($g->status === 'draft')
-                            <div class="flex gap-2">
-                                <button wire:click="approve({{ $g->id }})" wire:confirm="اعتماد هذه المسودة كصياغة نهائية؟"
-                                        class="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded">اعتماد</button>
-                                <button wire:click="reject({{ $g->id }})"
-                                        class="text-xs px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded">رفض</button>
-                            </div>
-                        @endif
+                        <span class="text-xs text-lexa-700">فتح ←</span>
                     </div>
-                    <pre class="text-sm whitespace-pre-wrap font-arabic" dir="rtl">{{ \Illuminate\Support\Str::limit($g->output ?? '', 800) }}</pre>
-                </div>
+                    <pre class="text-sm whitespace-pre-wrap font-arabic" dir="rtl">{{ \Illuminate\Support\Str::limit($g->output ?? '', 500) }}</pre>
+                </a>
             @empty
                 <div class="bg-white shadow-sm rounded-lg p-12 text-center text-gray-500">
                     لا توجد مسودات بعد. ابدأ بإضافة قالب وبنود معتمدة، ثم أنشئ مسودة جديدة.

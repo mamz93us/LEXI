@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Livewire\AiDrafter\Detail as AiDrafterDetail;
 use App\Livewire\AiDrafter\Index as AiDrafterIndex;
 use App\Livewire\AiDrafter\Wizard as AiDrafterWizard;
 use App\Livewire\Calendar\Index as CalendarIndex;
@@ -105,6 +106,7 @@ Route::middleware([
         // --- AI drafter ---
         Route::get('ai-drafter', AiDrafterIndex::class)->name('ai-drafter.index');
         Route::get('ai-drafter/new', AiDrafterWizard::class)->name('ai-drafter.wizard');
+        Route::get('ai-drafter/{generation}', AiDrafterDetail::class)->name('ai-drafter.show');
 
         // --- Proxies ---
         Route::get('proxies', ProxiesIndex::class)->name('proxies.index');
