@@ -54,7 +54,10 @@ return [
             'public' => '%storage_path%/app/public/',
         ],
         'suffix_storage_path' => true,
-        'asset_helper_tenancy' => true,
+        // `asset()` MUST keep public URLs unprefixed (e.g. /build/...) so
+        // Vite-built CSS/JS resolves correctly. Use `tenant_asset()`
+        // explicitly for tenant-private uploads — not the generic helper.
+        'asset_helper_tenancy' => false,
     ],
 
     // --- Redis prefixing -------------------------------------------------
