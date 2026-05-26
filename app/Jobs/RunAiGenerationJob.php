@@ -41,8 +41,14 @@ final class RunAiGenerationJob implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    /** Allow the job up to 5 minutes — Claude on 8k tokens can be slow. */
-    public int $timeout = 300;
+    /**
+     * Allow the worker up to 5 minutes. Must exceed
+     * `config('lexa.anthropic.timeout')` (default 280s) so the HTTP
+     * timeout surfaces cleanly as a `cURL error 28` we can catch and
+     * write to `output`, rather than the worker getting SIGKILL'd
+     * mid-call and leaving the row stuck in `generating`.
+     */
+    public int $timeout = 320;
 
     /** Don't retry on failure — a bad prompt won't get better on a re-run. */
     public int $tries = 1;

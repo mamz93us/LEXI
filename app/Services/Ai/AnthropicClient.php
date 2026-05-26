@@ -69,9 +69,19 @@ final class AnthropicClient
         // contract), not via a per-request beta flag. Sending a guessed value
         // here makes their validator reject the entire request.
 
+        // Claude on 8k tokens of Arabic legal output can run 60–240 seconds.
+        // Read-timeout is the time waiting for the response body; connect-
+        // timeout stays short so a real network failure fails fast instead of
+        // hanging the queue worker for minutes. The read timeout is intentionally
+        // a bit shorter than RunAiGenerationJob::$timeout so the HTTP error
+        // surfaces cleanly before the worker is killed.
+        $timeout = (int) config('lexa.anthropic.timeout', 280);
+        $connectTimeout = (int) config('lexa.anthropic.connect_timeout', 20);
+
         $response = $this->http
             ->withHeaders($headers)
-            ->timeout(120)
+            ->timeout($timeout)
+            ->connectTimeout($connectTimeout)
             ->post('https://api.anthropic.com/v1/messages', [
                 'model' => $model,
                 'max_tokens' => $maxTokens,

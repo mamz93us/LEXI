@@ -37,6 +37,14 @@ return [
         // Long legal contracts can run 6k–12k tokens. 8192 is a safer default
         // than 4096 for drafting; admins can override per-tenant in Settings → AI.
         'max_tokens' => (int) env('ANTHROPIC_MAX_TOKENS', 8192),
+        // HTTP read timeout in seconds. Claude on 8k tokens of Arabic output
+        // routinely runs 60–240s, so we wait up to ~280s before giving up.
+        // Kept under RunAiGenerationJob::$timeout (300s) so a clean error
+        // surfaces before the worker is killed.
+        'timeout' => (int) env('ANTHROPIC_TIMEOUT', 280),
+        // Connect timeout — short so a real network failure (DNS / TLS) fails
+        // fast instead of hanging the worker for minutes.
+        'connect_timeout' => (int) env('ANTHROPIC_CONNECT_TIMEOUT', 20),
     ],
 
     /*
