@@ -4,7 +4,13 @@
     'rows' => 22,
 ])
 @php
+    // Build all PHP-side values here, OUTSIDE any @js(...) call. Blade's
+    // naive paren counter in `@js(...)` mis-parses casts and other inner
+    // parens (e.g. `@js((string) $foo)` captures only `(string)`) which
+    // produces invalid PHP in the compiled view and cascades into a
+    // syntax error against the JS that follows.
     $groups = \App\Services\Templates\VariableCatalog::groupTokens();
+    $initialValue = $initial === null ? '' : (string) $initial;
 @endphp
 
 @once
@@ -203,7 +209,7 @@
 
 <div wire:ignore
      class="grid grid-cols-1 lg:grid-cols-[1fr_15rem] gap-3"
-     x-data="lexaTemplateEditor({ groups: @js($groups), wireKey: @js($wireKey), initial: @js((string) $initial) })"
+     x-data="lexaTemplateEditor({ groups: @js($groups), wireKey: @js($wireKey), initial: @js($initialValue) })"
      x-init="init()">
 
     {{-- ===== Editor + inline autocomplete popup ===== --}}
