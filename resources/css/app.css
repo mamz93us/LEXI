@@ -1,3 +1,6 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Hide Alpine x-cloak'd elements until Alpine boots and removes the attribute. */
+[x-cloak] { display: none !important; }

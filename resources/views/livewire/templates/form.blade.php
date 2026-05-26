@@ -28,21 +28,13 @@
                 <input wire:model="description" type="text" class="mt-1 w-full rounded-md border-gray-300 shadow-sm" />
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-[1fr_18rem] gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">جسم القالب</label>
-                    <p class="text-xs text-gray-500 mb-1">
-                        انقر على أي متغير من القائمة على اليسار لإدراجه في موضع المؤشر، أو اكتب يدوياً
-                        <code class="bg-gray-100 px-1 rounded">@{{seller.name}}</code> أو <code class="bg-gray-100 px-1 rounded">@{{contract.place}}</code>.
-                    </p>
-                    <textarea wire:model="body" rows="22"
-                              class="mt-1 w-full rounded-md border-gray-300 shadow-sm font-mono text-sm leading-7" dir="rtl"></textarea>
-                    @error('body') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-                </div>
-
-                <div>
-                    <x-variable-chips target="body" />
-                </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">جسم القالب</label>
+                <p class="text-xs text-gray-500 mb-2">
+                    اكتب <code class="bg-gray-100 px-1 rounded">@{{</code> لظهور قائمة المتغيرات تلقائياً، أو استخدم اللوحة الجانبية. <kbd class="px-1 py-0.5 bg-gray-100 border rounded text-[10px]">Ctrl</kbd>+<kbd class="px-1 py-0.5 bg-gray-100 border rounded text-[10px]">Z</kbd> للتراجع يعمل بشكل طبيعي.
+                </p>
+                <x-template-editor wire-key="body" :initial="$body" :rows="22" />
+                @error('body') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
             </div>
 
             <details class="border rounded-md">
