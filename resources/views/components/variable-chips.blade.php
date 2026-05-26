@@ -71,7 +71,7 @@
                     @foreach ($group['tokens'] as $tk)
                         <button type="button"
                                 x-show="tokenVisible(@js($tk))"
-                                @click.prevent="insert(@js('{{ '.$tk['token'].' }}'))"
+                                @click.prevent="insert(@js($tk['snippet']))"
                                 class="text-xs px-2 py-1 bg-white border border-gray-300 rounded hover:bg-lexa-50 hover:border-lexa-300 transition"
                                 title="{{ $tk['token'] }}">
                             {{ $tk['label_ar'] }}

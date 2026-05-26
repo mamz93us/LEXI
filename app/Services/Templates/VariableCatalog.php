@@ -85,15 +85,22 @@ final class VariableCatalog
      * Build the full list of party tokens for one namespace, e.g.
      * `seller` → `['seller.name', 'seller.national_id', ...]`.
      *
-     * @return array<int, array{token: string, label_ar: string}>
+     * Each entry carries a pre-built `snippet` like `{{seller.name}}`.
+     * IMPORTANT: the snippet is built here in PHP — Blade NEVER sees the
+     * literal `{{` `}}` characters in template source, so it can't
+     * misinterpret them as echo tags.
+     *
+     * @return array<int, array{token: string, label_ar: string, snippet: string}>
      */
     public static function partyTokens(string $namespace): array
     {
         $out = [];
         foreach (self::PARTY_FIELDS as $field => $label) {
+            $token = "{$namespace}.{$field}";
             $out[] = [
-                'token' => "{$namespace}.{$field}",
+                'token' => $token,
                 'label_ar' => $label,
+                'snippet' => '{{'.$token.'}}',
             ];
         }
 
@@ -126,6 +133,7 @@ final class VariableCatalog
             $contractTokens[] = [
                 'token' => $token,
                 'label_ar' => $meta['label_ar'],
+                'snippet' => '{{'.$token.'}}',
             ];
         }
         $groups[] = [

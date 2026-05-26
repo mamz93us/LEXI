@@ -58,3 +58,24 @@ it('returns the arabic label for a known party namespace', function () {
     expect(VariableCatalog::partyLabel('seller'))->toBe('البائع');
     expect(VariableCatalog::partyLabel('buyer'))->toBe('المشتري');
 });
+
+it('includes a pre-built snippet for every token (avoids Blade {{ }} mis-parsing)', function () {
+    $partyTokens = VariableCatalog::partyTokens('buyer');
+    $first = $partyTokens[0];
+
+    expect($first)
+        ->toHaveKey('snippet')
+        ->and($first['snippet'])
+        ->toStartWith('{{')
+        ->toEndWith('}}')
+        ->toContain('buyer.');
+
+    // Groups must also carry snippets on every token entry.
+    foreach (VariableCatalog::groupTokens() as $group) {
+        foreach ($group['tokens'] as $tk) {
+            expect($tk['snippet'] ?? null)
+                ->not->toBeNull("missing snippet for {$tk['token']}")
+                ->toBe('{{'.$tk['token'].'}}');
+        }
+    }
+});
