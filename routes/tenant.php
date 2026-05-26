@@ -106,6 +106,7 @@ Route::middleware([
         // --- AI drafter ---
         Route::get('ai-drafter', AiDrafterIndex::class)->name('ai-drafter.index');
         Route::get('ai-drafter/new', AiDrafterWizard::class)->name('ai-drafter.wizard');
+        Route::get('ai-drafter/quick', \App\Livewire\AiDrafter\QuickDraft::class)->name('ai-drafter.quick');
         Route::get('ai-drafter/{generation}', AiDrafterDetail::class)->name('ai-drafter.show');
 
         // --- Proxies ---

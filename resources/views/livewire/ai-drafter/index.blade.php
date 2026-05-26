@@ -1,14 +1,20 @@
 <div class="py-8 px-4 sm:px-6 lg:px-8">
     <div class="max-w-6xl mx-auto">
-        <div class="flex justify-between items-center mb-6">
+        <div class="flex flex-wrap justify-between items-start gap-3 mb-6">
             <div>
                 <h2 class="text-2xl font-semibold text-gray-900">صياغة العقود الآلية</h2>
                 <p class="text-sm text-gray-500 mt-1">مسودات يولّدها المساعد بناءً على قوالب وبنود مكتبك. كل مسودة تظهر بعلامة «مسودة آلية — قيد المراجعة» حتى يعتمدها شريك.</p>
             </div>
-            <a href="{{ route('ai-drafter.wizard') }}" wire:navigate
-               class="inline-flex items-center px-4 py-2 bg-lexa-600 hover:bg-lexa-700 text-white text-sm font-medium rounded-md transition">
-                مسودة جديدة
-            </a>
+            <div class="flex flex-wrap items-center gap-2">
+                <a href="{{ route('ai-drafter.quick') }}" wire:navigate
+                   class="inline-flex items-center px-4 py-2 bg-white border border-lexa-300 text-lexa-700 hover:bg-lexa-50 text-sm font-medium rounded-md transition">
+                    ✨ صياغة سريعة (بدون قالب)
+                </a>
+                <a href="{{ route('ai-drafter.wizard') }}" wire:navigate
+                   class="inline-flex items-center px-4 py-2 bg-lexa-600 hover:bg-lexa-700 text-white text-sm font-medium rounded-md transition">
+                    صياغة من قالب موجود
+                </a>
+            </div>
         </div>
 
         @if (session('error'))
