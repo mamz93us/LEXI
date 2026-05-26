@@ -16,8 +16,15 @@ use RuntimeException;
  * `.env`-backed config as fallback. So the firm can rotate the key
  * from Settings → AI without an SSH redeploy.
  *
- * Use the zero-retention tier in production. Every call site MUST log
- * a corresponding row to `ai_generations` for audit.
+ * Zero-data-retention (ZDR) is enabled by Anthropic on the **account /
+ * organisation** side via your Enterprise / commercial agreement — not
+ * via a request header. The `anthropic_zero_retention` setting in this
+ * app is purely informational so admins know what compliance posture
+ * the firm has agreed to with Anthropic; we do not send it on the
+ * wire. Verify the org-level ZDR status in your Anthropic Console.
+ *
+ * Every call site MUST log a corresponding row to `ai_generations`
+ * for audit (handled by RagGenerator).
  */
 final class AnthropicClient
 {
@@ -43,12 +50,6 @@ final class AnthropicClient
             config('lexa.anthropic.model', 'claude-opus-4-7'),
         );
 
-        $zeroRetention = (bool) $this->settings->get(
-            'ai',
-            'anthropic_zero_retention',
-            config('lexa.anthropic.zero_retention', true),
-        );
-
         $maxTokens = (int) $this->settings->get(
             'ai',
             'anthropic_max_tokens',
@@ -63,12 +64,10 @@ final class AnthropicClient
             'Content-Type' => 'application/json',
         ];
 
-        if ($zeroRetention) {
-            // The exact opt-out header is configured per-org in the Anthropic
-            // contract. Replace this name once Anthropic confirms the header
-            // value for the firm's zero-retention agreement.
-            $headers['anthropic-beta'] = 'no-train-2025-01';
-        }
+        // NOTE: We deliberately do NOT send an `anthropic-beta` header for ZDR.
+        // Anthropic enables zero-data-retention at the org level (Console /
+        // contract), not via a per-request beta flag. Sending a guessed value
+        // here makes their validator reject the entire request.
 
         $response = $this->http
             ->withHeaders($headers)
