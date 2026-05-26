@@ -1,4 +1,5 @@
-<div class="py-8 px-4 sm:px-6 lg:px-8">
+<div class="py-8 px-4 sm:px-6 lg:px-8"
+     @if ($this->isInFlight()) wire:poll.2s @endif>
     <div class="max-w-5xl mx-auto space-y-6">
 
         {{-- Header --}}
@@ -12,11 +13,25 @@
                 </p>
             </div>
             <div class="flex items-center gap-2">
-                <span class="text-xs px-3 py-1 rounded
-                    {{ $generation->status === 'approved' ? 'bg-green-100 text-green-800' : '' }}
-                    {{ $generation->status === 'rejected' ? 'bg-red-100 text-red-800' : '' }}
-                    {{ in_array($generation->status, ['draft', 'reviewed']) ? 'bg-amber-100 text-amber-800' : '' }}">
-                    {{ ['draft' => 'مسودة آلية — قيد المراجعة', 'reviewed' => 'تمت المراجعة', 'approved' => 'معتمد', 'rejected' => 'مرفوض'][$generation->status] ?? $generation->status }}
+                @php
+                    $statusLabels = [
+                        'pending' => 'في الانتظار…',
+                        'generating' => 'جاري التوليد…',
+                        'draft' => 'مسودة آلية — قيد المراجعة',
+                        'reviewed' => 'تمت المراجعة',
+                        'approved' => 'معتمد',
+                        'rejected' => 'مرفوض',
+                        'failed' => 'فشل التوليد',
+                    ];
+                    $statusClass = match ($generation->status) {
+                        'approved' => 'bg-green-100 text-green-800',
+                        'rejected', 'failed' => 'bg-red-100 text-red-800',
+                        'pending', 'generating' => 'bg-blue-100 text-blue-800 animate-pulse',
+                        default => 'bg-amber-100 text-amber-800',
+                    };
+                @endphp
+                <span class="text-xs px-3 py-1 rounded {{ $statusClass }}">
+                    {{ $statusLabels[$generation->status] ?? $generation->status }}
                 </span>
                 <a href="{{ route('ai-drafter.index') }}" wire:navigate
                    class="text-sm text-lexa-700 hover:text-lexa-900">← كل المسودات</a>
@@ -30,78 +45,116 @@
             <div class="bg-red-50 border-s-4 border-red-500 p-3 text-sm text-red-800">{{ $error }}</div>
         @endif
 
-        {{-- Current output --}}
-        <div class="bg-white shadow-sm rounded-lg p-6">
-            @if ($generation->status === 'draft')
-                <div class="bg-amber-50 border-s-4 border-amber-400 p-3 mb-4">
-                    <p class="text-sm font-medium text-amber-800">مسودة آلية — قيد المراجعة</p>
-                    <p class="text-xs text-amber-700 mt-1">يجب اعتمادها من شريك قبل الإرسال أو التوثيق.</p>
+        {{-- ===== In-flight state: waiting for the queued job to finish ===== --}}
+        @if ($this->isInFlight())
+            <div class="bg-white shadow-sm rounded-lg p-8 text-center">
+                <div class="inline-flex items-center justify-center w-16 h-16 mb-4 rounded-full bg-lexa-50">
+                    <svg class="animate-spin w-8 h-8 text-lexa-600" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
                 </div>
-            @endif
-
-            @if (! $show_manual_editor)
-                <pre class="text-sm whitespace-pre-wrap font-arabic leading-7 bg-gray-50 p-4 rounded-md max-h-[600px] overflow-y-auto" dir="rtl">{{ $generation->output }}</pre>
-            @else
-                <div class="space-y-2">
-                    <label class="block text-sm font-medium text-gray-700">حرر النص يدوياً ثم احفظ كإصدار جديد</label>
-                    <textarea wire:model="manual_edit" rows="24" dir="rtl"
-                              class="w-full rounded-md border-gray-300 shadow-sm font-arabic leading-7"></textarea>
-                    <div class="flex justify-end gap-2">
-                        <button wire:click="$set('show_manual_editor', false)"
-                                class="px-3 py-1.5 text-sm text-gray-700 hover:text-gray-900">إلغاء</button>
-                        <button wire:click="saveManualEdit"
-                                class="px-4 py-1.5 bg-lexa-600 hover:bg-lexa-700 text-white text-sm rounded-md">
-                            حفظ كإصدار جديد
-                        </button>
-                    </div>
-                </div>
-            @endif
-        </div>
-
-        {{-- Action bar --}}
-        <div class="bg-white shadow-sm rounded-lg p-4 flex flex-wrap items-center gap-3">
-            @unless ($show_manual_editor)
-                <button wire:click="$set('show_manual_editor', true)"
-                        class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-md">
-                    ✏️ تعديل يدوي
-                </button>
-            @endunless
-
-            @if ($generation->status === 'draft')
-                <button wire:click="approve" wire:confirm="اعتماد هذه المسودة كصياغة نهائية؟"
-                        class="px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 text-white rounded-md">
-                    ✓ اعتماد
-                </button>
-                <button wire:click="reject"
-                        class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-md">
-                    ✗ رفض
-                </button>
-            @endif
-
-            <span class="ms-auto text-xs text-gray-500">
-                النموذج: <code>{{ $generation->model }}</code>
-            </span>
-        </div>
-
-        {{-- AI refinement --}}
-        <div class="bg-white shadow-sm rounded-lg p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-2">طلب تعديل من الذكاء الاصطناعي</h3>
-            <p class="text-sm text-gray-500 mb-4">
-                اكتب ما تريد تغييره (مثل: «اجعل البند الأول أكثر وضوحاً»، أو «أضف بند تحكيم في القاهرة»، أو «استبدل الاسم بمحمد علي»). Claude سيعيد كامل المسودة بالتعديل المطلوب كإصدار جديد.
-            </p>
-            <textarea wire:model="refinement_instruction" rows="4" dir="rtl"
-                      placeholder="مثال: استبدل قيمة العقد بـ 5,000,000 جنيه، وأضف بنداً يلزم البائع بتسليم المخططات الهندسية."
-                      class="w-full rounded-md border-gray-300 shadow-sm font-arabic"></textarea>
-            <div class="flex justify-end mt-3">
-                <button wire:click="refineWithAi" wire:loading.attr="disabled"
-                        class="px-5 py-2 bg-lexa-600 hover:bg-lexa-700 text-white text-sm font-medium rounded-md disabled:opacity-50">
-                    <span wire:loading.remove wire:target="refineWithAi">إرسال للذكاء الاصطناعي</span>
-                    <span wire:loading wire:target="refineWithAi">جاري التعديل…</span>
-                </button>
+                <h3 class="text-lg font-semibold text-gray-900 mb-1">
+                    {{ $generation->status === 'pending' ? 'في انتظار بدء التوليد…' : 'الذكاء الاصطناعي يصيغ المسودة الآن…' }}
+                </h3>
+                <p class="text-sm text-gray-500">
+                    عقود طويلة قد تحتاج 30–120 ثانية. الصفحة تتحدّث تلقائياً عند الانتهاء.
+                </p>
+                <p class="text-xs text-gray-400 mt-3">
+                    لا حاجة للانتظار — يمكنك إغلاق الصفحة والعودة لاحقاً من قائمة «المسودات».
+                </p>
             </div>
-        </div>
 
-        {{-- Version chain --}}
+        {{-- ===== Failure state ===== --}}
+        @elseif ($generation->status === 'failed')
+            <div class="bg-white shadow-sm rounded-lg p-6">
+                <div class="bg-red-50 border-s-4 border-red-400 p-4 mb-4">
+                    <p class="text-sm font-medium text-red-800 mb-1">فشل التوليد</p>
+                    <pre class="text-xs text-red-700 font-mono whitespace-pre-wrap">{{ $generation->output }}</pre>
+                    <p class="text-sm text-red-700 mt-3">
+                        تحقّق من
+                        <a href="{{ route('settings.index') }}" wire:navigate class="text-lexa-700 hover:underline">الإعدادات → الذكاء الاصطناعي</a>
+                        — تأكّد من صحة مفتاح Anthropic وأن نموذج الإعدادات صالح، ثم أعد المحاولة من
+                        <a href="{{ route('ai-drafter.wizard') }}" wire:navigate class="text-lexa-700 hover:underline">معالج صياغة جديدة</a>.
+                    </p>
+                </div>
+            </div>
+
+        {{-- ===== Normal: settled output, full review UI ===== --}}
+        @else
+            {{-- Current output --}}
+            <div class="bg-white shadow-sm rounded-lg p-6">
+                @if ($generation->status === 'draft')
+                    <div class="bg-amber-50 border-s-4 border-amber-400 p-3 mb-4">
+                        <p class="text-sm font-medium text-amber-800">مسودة آلية — قيد المراجعة</p>
+                        <p class="text-xs text-amber-700 mt-1">يجب اعتمادها من شريك قبل الإرسال أو التوثيق.</p>
+                    </div>
+                @endif
+
+                @if (! $show_manual_editor)
+                    <pre class="text-sm whitespace-pre-wrap font-arabic leading-7 bg-gray-50 p-4 rounded-md max-h-[600px] overflow-y-auto" dir="rtl">{{ $generation->output }}</pre>
+                @else
+                    <div class="space-y-2">
+                        <label class="block text-sm font-medium text-gray-700">حرر النص يدوياً ثم احفظ كإصدار جديد</label>
+                        <textarea wire:model="manual_edit" rows="24" dir="rtl"
+                                  class="w-full rounded-md border-gray-300 shadow-sm font-arabic leading-7"></textarea>
+                        <div class="flex justify-end gap-2">
+                            <button wire:click="$set('show_manual_editor', false)"
+                                    class="px-3 py-1.5 text-sm text-gray-700 hover:text-gray-900">إلغاء</button>
+                            <button wire:click="saveManualEdit"
+                                    class="px-4 py-1.5 bg-lexa-600 hover:bg-lexa-700 text-white text-sm rounded-md">
+                                حفظ كإصدار جديد
+                            </button>
+                        </div>
+                    </div>
+                @endif
+            </div>
+
+            {{-- Action bar --}}
+            <div class="bg-white shadow-sm rounded-lg p-4 flex flex-wrap items-center gap-3">
+                @unless ($show_manual_editor)
+                    <button wire:click="$set('show_manual_editor', true)"
+                            class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-md">
+                        ✏️ تعديل يدوي
+                    </button>
+                @endunless
+
+                @if ($generation->status === 'draft')
+                    <button wire:click="approve" wire:confirm="اعتماد هذه المسودة كصياغة نهائية؟"
+                            class="px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 text-white rounded-md">
+                        ✓ اعتماد
+                    </button>
+                    <button wire:click="reject"
+                            class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-md">
+                        ✗ رفض
+                    </button>
+                @endif
+
+                <span class="ms-auto text-xs text-gray-500">
+                    النموذج: <code>{{ $generation->model }}</code>
+                </span>
+            </div>
+
+            {{-- AI refinement --}}
+            <div class="bg-white shadow-sm rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">طلب تعديل من الذكاء الاصطناعي</h3>
+                <p class="text-sm text-gray-500 mb-4">
+                    اكتب ما تريد تغييره (مثل: «اجعل البند الأول أكثر وضوحاً»، أو «أضف بند تحكيم في القاهرة»، أو «استبدل الاسم بمحمد علي»). Claude سيعيد كامل المسودة بالتعديل المطلوب كإصدار جديد.
+                </p>
+                <textarea wire:model="refinement_instruction" rows="4" dir="rtl"
+                          placeholder="مثال: استبدل قيمة العقد بـ 5,000,000 جنيه، وأضف بنداً يلزم البائع بتسليم المخططات الهندسية."
+                          class="w-full rounded-md border-gray-300 shadow-sm font-arabic"></textarea>
+                <div class="flex justify-end mt-3">
+                    <button wire:click="refineWithAi" wire:loading.attr="disabled"
+                            class="px-5 py-2 bg-lexa-600 hover:bg-lexa-700 text-white text-sm font-medium rounded-md disabled:opacity-50">
+                        <span wire:loading.remove wire:target="refineWithAi">إرسال للذكاء الاصطناعي</span>
+                        <span wire:loading wire:target="refineWithAi">جاري الإرسال…</span>
+                    </button>
+                </div>
+            </div>
+        @endif
+
+        {{-- Version chain (always visible) --}}
         <div class="bg-white shadow-sm rounded-lg p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">سلسلة الإصدارات</h3>
             <ol class="space-y-3">
@@ -122,8 +175,9 @@
                             <div class="flex items-center gap-2 flex-shrink-0">
                                 <span class="text-xs px-2 py-0.5 rounded
                                     {{ $rev->status === 'approved' ? 'bg-green-100 text-green-800' : '' }}
-                                    {{ $rev->status === 'rejected' ? 'bg-red-100 text-red-800' : '' }}
-                                    {{ in_array($rev->status, ['draft', 'reviewed']) ? 'bg-amber-100 text-amber-800' : '' }}">
+                                    {{ in_array($rev->status, ['rejected', 'failed']) ? 'bg-red-100 text-red-800' : '' }}
+                                    {{ in_array($rev->status, ['draft', 'reviewed']) ? 'bg-amber-100 text-amber-800' : '' }}
+                                    {{ in_array($rev->status, ['pending', 'generating']) ? 'bg-blue-100 text-blue-800' : '' }}">
                                     {{ $rev->status }}
                                 </span>
                                 @unless ($isCurrent)

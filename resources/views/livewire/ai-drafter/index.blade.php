@@ -21,12 +21,25 @@
                    class="block bg-white shadow-sm rounded-lg p-4 hover:shadow-md transition">
                     <div class="flex justify-between items-start mb-2">
                         <div>
-                            <span class="text-xs px-2 py-1 rounded
-                                {{ $g->status === 'approved' ? 'bg-green-100 text-green-800' : '' }}
-                                {{ $g->status === 'rejected' ? 'bg-red-100 text-red-800' : '' }}
-                                {{ in_array($g->status, ['draft', 'reviewed']) ? 'bg-amber-100 text-amber-800' : '' }}">
-                                {{ $g->status === 'draft' ? 'مسودة آلية — قيد المراجعة' : $g->status }}
-                            </span>
+                            @php
+                                $statusClass = match ($g->status) {
+                                    'approved' => 'bg-green-100 text-green-800',
+                                    'rejected', 'failed' => 'bg-red-100 text-red-800',
+                                    'pending', 'generating' => 'bg-blue-100 text-blue-800 animate-pulse',
+                                    default => 'bg-amber-100 text-amber-800',
+                                };
+                                $statusLabel = match ($g->status) {
+                                    'pending' => 'في الانتظار…',
+                                    'generating' => 'جاري التوليد…',
+                                    'draft' => 'مسودة آلية — قيد المراجعة',
+                                    'reviewed' => 'تمت المراجعة',
+                                    'approved' => 'معتمد',
+                                    'rejected' => 'مرفوض',
+                                    'failed' => 'فشل التوليد',
+                                    default => $g->status,
+                                };
+                            @endphp
+                            <span class="text-xs px-2 py-1 rounded {{ $statusClass }}">{{ $statusLabel }}</span>
                             @if ($g->revision_kind && $g->revision_kind !== 'initial')
                                 <span class="text-xs px-2 py-1 rounded bg-lexa-50 text-lexa-700 ms-1">
                                     {{ $g->revision_kind === 'ai_refine' ? 'تعديل آلي' : 'تعديل يدوي' }}

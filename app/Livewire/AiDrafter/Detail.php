@@ -36,11 +36,37 @@ class Detail extends Component
         $this->manual_edit = $generation->output ?? '';
     }
 
+    /**
+     * Drive the wire:poll cadence from the page. Returns the seconds the
+     * UI should re-render every; 0 means "no need to poll, generation is
+     * already settled".
+     */
+    public function getPollSecondsProperty(): int
+    {
+        return $this->isInFlight() ? 2 : 0;
+    }
+
+    public function isInFlight(): bool
+    {
+        return in_array($this->generation->status, ['pending', 'generating'], true);
+    }
+
+    /**
+     * Re-read the row from DB on each poll tick. Livewire calls this
+     * automatically when wire:poll triggers (Livewire re-runs render +
+     * any property hooks).
+     */
+    public function refreshStatus(): void
+    {
+        $this->generation->refresh();
+        if (! $this->isInFlight()) {
+            $this->manual_edit = $this->generation->output ?? '';
+        }
+    }
+
     #[Computed]
     public function chain(): Collection
     {
-        // chain() returns a Support\Collection (built with collect()); the
-        // view only reads scalar fields, no eager-load needed.
         return $this->generation->chain();
     }
 
@@ -125,6 +151,12 @@ class Detail extends Component
 
     public function render(): View
     {
+        // Re-read on every render so wire:poll picks up status changes.
+        $this->generation->refresh();
+        if (! $this->isInFlight() && $this->manual_edit === '') {
+            $this->manual_edit = $this->generation->output ?? '';
+        }
+
         return view('livewire.ai-drafter.detail');
     }
 }

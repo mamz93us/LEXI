@@ -4,32 +4,33 @@ declare(strict_types=1);
 
 namespace App\Services\Rag;
 
+use App\Jobs\RunAiGenerationJob;
 use App\Models\AiGeneration;
 use App\Models\ClauseVersion;
 use App\Models\TemplateVersion;
-use App\Services\Ai\AnthropicClient;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
-use Throwable;
 
 /**
- * Orchestrates the end-to-end RAG flow: retrieve → assemble → call LLM →
- * persist as `AiGeneration` row with status=draft. The lawyer reviews
- * and approves later via the UI.
+ * Orchestrates the RAG flow: retrieve → assemble → queue an LLM call →
+ * return immediately. The actual Anthropic call runs in a queued
+ * `RunAiGenerationJob`. The lawyer's browser sees a `pending` row and
+ * polls the Detail page until the job finishes.
  *
- * The persisted row is the audit trail required by CLAUDE.md §6.5.
+ * Why async: long Arabic contracts can take 30–120 seconds for Claude to
+ * draft at 8k tokens; doing that inside the Livewire request risks hitting
+ * PHP-FPM / proxy timeouts and leaves the UI hung. Queueing decouples the
+ * LLM latency from the web request.
  *
- * Refinement: `refine()` continues the same Claude conversation with the
- * previous draft as assistant context + a new user instruction. Each
- * refinement creates a new AiGeneration linked by parent_id so the chain
- * is preserved.
+ * The persisted `AiGeneration` row is the audit trail required by
+ * CLAUDE.md §6.5 — it's created BEFORE the LLM call so a failed call still
+ * leaves a trace.
  */
 final class RagGenerator
 {
     public function __construct(
         private readonly RagRetrievalService $retriever,
         private readonly PromptAssembler $assembler,
-        private readonly AnthropicClient $anthropic,
     ) {}
 
     /**
@@ -52,8 +53,6 @@ final class RagGenerator
             template: $template,
         );
 
-        // Audit row is created BEFORE the LLM call so a failed call still
-        // leaves a trace of what was sent.
         $generation = AiGeneration::create([
             'subject_type' => $subject->getMorphClass(),
             'subject_id' => $subject->getKey(),
@@ -63,29 +62,23 @@ final class RagGenerator
             'prompt' => $this->serializePrompt($prompt),
             'retrieved_chunk_ids' => $retrievedChunks->pluck('id')->all(),
             'output' => '',
-            'status' => 'draft',
+            'status' => 'pending',
         ]);
 
-        try {
-            $output = $this->anthropic->sendMessages($prompt['system'], $prompt['messages']);
-        } catch (Throwable $e) {
-            $generation->update([
-                'output' => '[AI call failed: '.$e->getMessage().']',
-                'status' => 'rejected',
-            ]);
-
-            throw $e;
-        }
-
-        $generation->update(['output' => $output]);
+        RunAiGenerationJob::dispatch(
+            $generation->id,
+            $prompt['system'],
+            $prompt['messages'],
+        );
 
         return $generation;
     }
 
     /**
-     * Conversational refinement: the previous draft becomes assistant context
-     * and `userInstruction` is the lawyer's request for changes. Returns a
-     * new AiGeneration row with parent_id pointing at the previous.
+     * Conversational refinement — same async pattern. The previous chain
+     * is replayed as Claude conversation context, plus the new user
+     * instruction. A new AiGeneration row is created with `parent_id`
+     * pointing at the previous so the chain is preserved.
      */
     public function refine(AiGeneration $previous, string $userInstruction): AiGeneration
     {
@@ -104,27 +97,21 @@ final class RagGenerator
             'user_instruction' => $userInstruction,
             'retrieved_chunk_ids' => $previous->retrieved_chunk_ids,
             'output' => '',
-            'status' => 'draft',
+            'status' => 'pending',
         ]);
 
-        try {
-            $output = $this->anthropic->sendMessages($systemPrompt, $chainMessages);
-        } catch (Throwable $e) {
-            $generation->update([
-                'output' => '[AI call failed: '.$e->getMessage().']',
-                'status' => 'rejected',
-            ]);
-
-            throw $e;
-        }
-
-        $generation->update(['output' => $output]);
+        RunAiGenerationJob::dispatch(
+            $generation->id,
+            $systemPrompt,
+            $chainMessages,
+        );
 
         return $generation;
     }
 
     /**
-     * Record a manual edit by the lawyer as a new revision. No Claude call.
+     * Manual edit by the lawyer. No Claude call — synchronous, returns
+     * a finished `draft` row immediately.
      */
     public function recordManualEdit(AiGeneration $previous, string $newOutput, ?string $note = null): AiGeneration
     {
@@ -155,7 +142,6 @@ final class RagGenerator
 
         foreach ($chain as $gen) {
             if ($gen->revision_kind === 'initial') {
-                // The original prompt is reconstructed from the persisted text.
                 $userPart = $this->extractUserMessage($gen);
                 if ($userPart !== '') {
                     $messages[] = ['role' => 'user', 'content' => $userPart];
@@ -171,9 +157,6 @@ final class RagGenerator
                     $messages[] = ['role' => 'assistant', 'content' => $gen->output];
                 }
             } elseif ($gen->revision_kind === 'manual_edit' && $gen->output !== '') {
-                // Inject the manual edit as the assistant's latest answer so the
-                // next AI refinement sees the lawyer's version, not the previous AI one.
-                // We pop the previous assistant turn and replace with this one.
                 $last = end($messages);
                 if ($last && $last['role'] === 'assistant') {
                     array_pop($messages);
@@ -208,7 +191,6 @@ final class RagGenerator
         }
         $body = substr($prompt, $pos + 7);
 
-        // The stored format is "user: ...content...". Strip the prefix.
         if (str_starts_with($body, 'user: ')) {
             return substr($body, 6);
         }
