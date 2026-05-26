@@ -34,7 +34,9 @@ return [
         'api_key' => env('ANTHROPIC_API_KEY'),
         'model' => env('ANTHROPIC_MODEL', 'claude-opus-4-7'),
         'zero_retention' => (bool) env('ANTHROPIC_ZERO_RETENTION', true),
-        'max_tokens' => (int) env('ANTHROPIC_MAX_TOKENS', 4096),
+        // Long legal contracts can run 6k–12k tokens. 8192 is a safer default
+        // than 4096 for drafting; admins can override per-tenant in Settings → AI.
+        'max_tokens' => (int) env('ANTHROPIC_MAX_TOKENS', 8192),
     ],
 
     /*

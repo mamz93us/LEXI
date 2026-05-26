@@ -64,6 +64,9 @@
                         <label class="block text-sm font-medium text-gray-700">حد الرموز (Max tokens)</label>
                         <input wire:model="anthropic_max_tokens" type="number" min="256" max="200000"
                                class="mt-1 w-full rounded-md border-gray-300 shadow-sm" />
+                        <p class="mt-1 text-xs text-gray-500">
+                            توكيلات: 2048 — عقود قياسية: 4096–8192 — عقود طويلة (بيع، شراكة): 16384+
+                        </p>
                     </div>
                     <div class="flex items-end">
                         <label class="inline-flex items-center gap-2 text-sm">
