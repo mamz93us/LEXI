@@ -20,17 +20,29 @@ use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
 /*
 |--------------------------------------------------------------------------
-| Subdomain-based tenant routes (primary)
+| Tenant routes
 |--------------------------------------------------------------------------
-| Anything under {slug}.lexa.test resolves through the subdomain
-| middleware. PreventAccessFromCentralDomains blocks the same paths
-| from being hit on the bare central domain.
+| In production lexi.deevar.cloud is a TENANT domain (not central), so
+| these routes resolve there directly: /login, /dashboard, /clients ...
+| In dev the same routes also work under any tenant subdomain such as
+| samir.lexa.test thanks to InitializeTenancyByDomainOrSubdomain.
+|
+| PreventAccessFromCentralDomains blocks any central host (configured
+| in config/tenancy.php — empty in production) from hitting tenant
+| paths.
 */
 Route::middleware([
     'web',
     InitializeTenancyByDomainOrSubdomain::class,
     PreventAccessFromCentralDomains::class,
 ])->group(function () {
+    // Root → dashboard for authed users, login otherwise.
+    Route::get('/', function () {
+        return auth()->check()
+            ? redirect()->route('dashboard')
+            : redirect()->route('login');
+    })->name('tenant.root');
+
     Route::get('dashboard', DashboardIndex::class)
         ->middleware(['auth', 'verified'])
         ->name('dashboard');
@@ -67,8 +79,9 @@ Route::middleware([
 |--------------------------------------------------------------------------
 | Path-based fallback (/t/{tenant}/...)
 |--------------------------------------------------------------------------
-| For contributors who cannot edit their hosts file. Production should
-| disable this group via config and rely on subdomains only.
+| Kept for contributors who can't edit their hosts file or for a future
+| multi-firm deployment without per-firm subdomains. Disabled by simply
+| not creating tenants with Domain rows.
 */
 Route::middleware([
     'web',
@@ -76,5 +89,9 @@ Route::middleware([
 ])
     ->prefix('/t/{tenant}')
     ->group(function () {
-        Route::view('/', 'tenant.dashboard')->name('tenant.dashboard.path');
+        Route::get('/', function () {
+            return auth()->check()
+                ? redirect()->route('dashboard')
+                : redirect()->route('login');
+        })->name('tenant.root.path');
     });

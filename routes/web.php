@@ -2,14 +2,12 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Facades\Route;
-
 /*
 |--------------------------------------------------------------------------
 | Central (landlord) routes
 |--------------------------------------------------------------------------
-| These run on the bare central domain (e.g. lexa.test, localhost).
-| Auth, dashboard and tenant-scoped routes live in routes/tenant.php.
+| In single-firm production deploys (lexi.deevar.cloud is itself a TENANT
+| domain) there are no central-only routes — everything is owned by the
+| tenant. This file stays so future centralized concerns (super-admin
+| dashboard, billing portal across firms) have a home.
 */
-
-Route::view('/', 'central.landing')->name('central.landing');

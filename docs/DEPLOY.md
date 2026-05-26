@@ -163,55 +163,46 @@ Within ~2 minutes the cert is live.
 # From any machine:
 curl -sI https://lexi.deevar.cloud/up      # → HTTP/2 200
 curl -s  https://lexi.deevar.cloud/up      # → JSON health payload
-
-# A central landing page should render:
-curl -s https://lexi.deevar.cloud/ | head -20
-
-# Path-based tenant routing — works immediately (no wildcard needed).
-# Replace `samir` with your real tenant slug once you create one.
-curl -sI https://lexi.deevar.cloud/t/samir/dashboard
 ```
 
-Then in a browser:
-1. Visit `https://lexi.deevar.cloud/` — central landing page.
-2. Once you create your first tenant in the admin (next section),
-   sign in at `https://lexi.deevar.cloud/t/<slug>/login`.
+A request to `https://lexi.deevar.cloud/` will currently 500 / redirect
+loop because no tenant is mapped to that hostname yet — fix that in §5.
 
-## 5. Create your first real tenant
+## 5. Create the primary tenant (single-firm deploy)
 
-There's no public registration in v1 — tenants are created by the
-super-admin. SSH back in as the cPanel user:
+This deploy ships **single-firm**: `lexi.deevar.cloud` IS the firm's
+domain, not a central landing. The app lives at `/login`,
+`/dashboard`, `/clients`, etc. directly — no `/t/<slug>/` prefix and no
+`<slug>.lexi.deevar.cloud` subdomain.
+
+Create the firm with one command, as the cPanel user:
 
 ```bash
 cd ~/lexa
-php artisan tinker
+./vendor/bin/php artisan lexa:install-primary-tenant \
+    --slug=lexa \
+    --name="Samir Group Legal" \
+    --domain=lexi.deevar.cloud \
+    --partner-email=mohamed@samir.legal \
+    --partner-name="محمد سمير" \
+    --partner-password='CHANGE-ME-NOW'
 ```
 
-Inside tinker:
+(Drop the `--*` flags if you want the prompts instead.)
 
-```php
-$tenant = App\Models\Tenant::create([
-    'id' => 'samir-real',           // becomes the slug (no spaces, lowercase)
-    'name' => 'Samir Group Legal',
-    'plan' => 'pro',
-    'settings' => [],
-    'branding' => [],
-]);
-$tenant->domains()->create(['domain' => 'samir-real.lexi.deevar.cloud']);
+The command is **idempotent** — re-running with the same slug refreshes
+the name and re-maps the domain. Re-run with a different `--slug` later
+when you onboard a second firm; map its own hostname or subdomain at
+that point.
 
-App\Models\User::create([
-    'tenant_id' => 'samir-real',
-    'name'      => 'محمد سمير',
-    'email'     => 'mohamed@samir.legal',
-    'password'  => Hash::make('CHANGE-ME-NOW'),
-    'role'      => App\Enums\UserRole::Partner->value,
-    'locale'    => 'ar',
-    'email_verified_at' => now(),
-]);
+Sign in immediately at:
+
+```
+https://lexi.deevar.cloud/login
 ```
 
-The partner can now log in at
-`https://lexi.deevar.cloud/t/samir-real/login`.
+The partner lands on `/dashboard`. **Rotate the password from inside
+the app after first login.**
 
 ## 6. Cron jobs
 
@@ -225,28 +216,31 @@ As the cPanel user (`crontab -e -u lexa`):
 Horizon is already running under supervisord — no cron entry needed for
 queue processing.
 
-## 7. (Optional, when ready) Enable subdomain tenant routing
+## 7. (Optional, only when adding a second firm) Onboarding more tenants
 
-You confirmed `lexi.deevar.cloud` resolves correctly. To support
-`samir.lexi.deevar.cloud` style URLs:
+The current deploy is single-firm — `lexa` lives at `lexi.deevar.cloud`.
+When a second firm signs up, you have three placement options:
 
-1. **DNS** — add a wildcard A record:
-   `*.lexi.deevar.cloud  A  <this server's IP>`
-   (do this at your DNS provider for `deevar.cloud`)
-2. **Apache vhost** — set the cPanel account to accept the wildcard:
-   - `WHM ▸ Account Functions ▸ Modify an Account` for `lexa`
-   - Add `*.lexi.deevar.cloud` as an additional parked / addon domain
-   - Or add a `VirtualHost` block via the Include Editor that aliases
-     `*.lexi.deevar.cloud` to the same docroot.
-3. **SSL** — wildcards need DNS-01 validation. Two options:
-   - Put the domain behind Cloudflare with "Full (strict)" — Cloudflare's
-     edge cert covers the wildcard, your origin uses the existing
-     AutoSSL cert.
-   - Or run `certbot certonly --dns-cloudflare -d '*.lexi.deevar.cloud'`
-     (or similar plugin for your DNS host), then point the cPanel SSL
-     setting at the resulting cert.
+**Option A — give them their own hostname** (recommended)
+```bash
+./vendor/bin/php artisan lexa:install-primary-tenant \
+    --slug=firmb --name="Firm B" --domain=portal.firmb.com \
+    --partner-email=admin@firmb.com --partner-password='…'
+```
+Then point `portal.firmb.com` DNS at this server and add the hostname
+as a Parked Domain on the cPanel account so Apache serves it from the
+same docroot.
 
-After this, sign-in URLs become `https://samir.lexi.deevar.cloud/login`.
+**Option B — give them a subdomain of lexi.deevar.cloud**
+Add a wildcard DNS record `*.lexi.deevar.cloud → <server-ip>`, then
+register the new tenant with `--domain=firmb.lexi.deevar.cloud`. Wildcard
+SSL needs DNS-01 validation (cloudflare, or certbot with a DNS plugin)
+or use Cloudflare's edge cert.
+
+**Option C — path-based, no DNS change**
+Skip the `--domain` flag entirely; the tenant becomes reachable at
+`https://lexi.deevar.cloud/t/firmb/login` via the path fallback that
+ships in `routes/tenant.php`.
 
 ## 8. Updating an existing deploy
 

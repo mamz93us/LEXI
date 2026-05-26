@@ -15,12 +15,18 @@ return [
     'id_generator' => null,
 
     // --- Central (landlord) domains --------------------------------------
-    // Any request hitting these domains skips tenant initialization.
-    'central_domains' => [
+    // Any request hitting these domains is treated as the bare landlord —
+    // no tenant initialised. In production we ship as single-firm with
+    // the app domain itself being a TENANT domain (mapped via a Domain
+    // row), so CENTRAL_DOMAIN is left empty there.
+    //
+    // Dev keeps `lexa.test` central so contributors get the existing
+    // samir/demo subdomain demo flow.
+    'central_domains' => array_values(array_filter([
         env('CENTRAL_DOMAIN', 'lexa.test'),
         '127.0.0.1',
         'localhost',
-    ],
+    ])),
 
     // --- Bootstrappers ---------------------------------------------------
     // Single-DB mode: no DatabaseTenancyBootstrapper. We use our own
