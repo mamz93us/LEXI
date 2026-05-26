@@ -14,6 +14,7 @@ use App\Services\Arabic\ArabicNormalizer;
 use App\Services\Embeddings\EmbeddingDriverManager;
 use Illuminate\Http\Client\Factory as HttpClient;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -36,6 +37,13 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // In production we are always behind cPanel's HTTPS proxy. Force
+        // every generated URL to https so OAuth / Stripe / mail links don't
+        // fall back to plain http.
+        if ($this->app->environment('production')) {
+            URL::forceScheme('https');
+        }
+
         // Route model bindings for params that don't match a model class name.
         Route::model('case', LegalCase::class);
         Route::model('client', Client::class);

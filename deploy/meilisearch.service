@@ -1,0 +1,24 @@
+[Unit]
+Description=Meilisearch — full-text search for LEXA
+After=network.target
+
+[Service]
+Type=simple
+User=meilisearch
+Group=meilisearch
+ExecStart=/usr/local/bin/meilisearch \
+    --db-path /var/lib/meilisearch/data.ms \
+    --env production \
+    --master-key __MEILI_KEY__ \
+    --http-addr 127.0.0.1:7700
+Restart=on-failure
+WorkingDirectory=/var/lib/meilisearch
+
+# Hardening
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

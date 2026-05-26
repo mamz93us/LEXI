@@ -14,6 +14,16 @@ class DemoTenantsSeeder extends Seeder
 {
     public function run(): void
     {
+        // Hard gate: never seed throwaway tenants on a production deploy.
+        // The deploy script only calls the reference-data seeders by name,
+        // but a tired admin running `php artisan db:seed` should still be
+        // protected.
+        if (app()->environment('production')) {
+            $this->command?->warn('DemoTenantsSeeder skipped: APP_ENV=production');
+
+            return;
+        }
+
         $this->createTenant(
             id: 'samir',
             name: 'Samir Group Legal',
