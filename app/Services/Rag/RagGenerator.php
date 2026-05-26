@@ -36,9 +36,18 @@ final class RagGenerator
     /**
      * @param  array<string, mixed>  $filledData
      * @param  Collection<int, ClauseVersion>  $verbatimClauses
+     *
+     * `$subject` is the polymorphic anchor for the audit row (LegalCase /
+     * Template / Document …). For from-scratch drafts that aren't tied to
+     * any existing model, pass null — the row still carries tenant_id via
+     * BelongsToTenant, which is the real isolation key.
+     *
+     * Subject must use an integer primary key, or null. Don't pass the
+     * Tenant model — its primary key is a slug string, which won't fit
+     * into the `ai_generations.subject_id bigint` column.
      */
     public function draft(
-        Model $subject,
+        ?Model $subject,
         string $userIntent,
         array $filledData,
         Collection $verbatimClauses,
@@ -54,8 +63,8 @@ final class RagGenerator
         );
 
         $generation = AiGeneration::create([
-            'subject_type' => $subject->getMorphClass(),
-            'subject_id' => $subject->getKey(),
+            'subject_type' => $subject?->getMorphClass(),
+            'subject_id' => $subject?->getKey(),
             'parent_id' => null,
             'revision_kind' => 'initial',
             'model' => config('lexa.anthropic.model'),

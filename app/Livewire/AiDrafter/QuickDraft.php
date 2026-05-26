@@ -9,7 +9,6 @@ use App\Models\ClauseVersion;
 use App\Models\Client;
 use App\Models\Court;
 use App\Models\LegalCase;
-use App\Models\Tenant;
 use App\Services\Rag\LegalDraftDiscovery;
 use App\Services\Rag\RagGenerator;
 use App\Services\Templates\DocumentTypeRegistry;
@@ -218,20 +217,14 @@ class QuickDraft extends Component
             return;
         }
 
-        // The audit row's "subject" is the linked case if any, else the
-        // current tenant (synthetic anchor for from-scratch drafts).
-        if ($this->case_id) {
-            $subject = LegalCase::query()->find($this->case_id);
-        } else {
-            $tenantId = tenant('id');
-            $subject = $tenantId ? Tenant::find($tenantId) : null;
-        }
-
-        if (! $subject) {
-            $this->error = 'تعذّر تحديد المرجع لتسجيل المسودة.';
-
-            return;
-        }
+        // The audit row's "subject" is the linked case if any, else null.
+        // We don't fall back to Tenant because its primary key is a slug
+        // string and `ai_generations.subject_id` is a bigint column —
+        // every audit row still carries `tenant_id` via BelongsToTenant,
+        // which is what enforces isolation.
+        $subject = $this->case_id
+            ? LegalCase::query()->find($this->case_id)
+            : null;
 
         $clauseVersions = ClauseVersion::query()
             ->whereIn('clause_id', $this->clause_ids)
