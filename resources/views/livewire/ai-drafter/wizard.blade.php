@@ -122,12 +122,32 @@
                 @endif
 
                 @if ($error)
+                    @php
+                        $isCohereErr = str_contains($error, 'Cohere') || str_contains(strtolower($error), 'cohere');
+                        $isAnthropicErr = str_contains($error, 'Anthropic') || str_contains($error, 'anthropic');
+                        $isKeyErr = str_contains($error, 'API key') || str_contains($error, '401') || str_contains($error, 'unauthorized');
+                    @endphp
                     <div class="bg-red-50 border-s-4 border-red-400 p-4 mb-4">
                         <p class="text-sm font-medium text-red-800 mb-1">فشل التوليد</p>
                         <p class="text-xs text-red-700 font-mono whitespace-pre-wrap">{{ $error }}</p>
-                        @if (str_contains($error, 'API key'))
+
+                        @if ($isCohereErr && $isKeyErr)
                             <p class="text-sm text-red-700 mt-2">
-                                ضع <code class="bg-white px-1 rounded">ANTHROPIC_API_KEY</code> في ملف <code class="bg-white px-1 rounded">.env</code> ثم نفّذ <code class="bg-white px-1 rounded">php artisan config:cache</code>.
+                                مفتاح خدمة التضمين (Cohere) مرفوض. افتح
+                                <a href="{{ route('settings.index') }}" class="text-lexa-700 hover:underline">الإعدادات → Embeddings</a>
+                                وأعد إدخال المفتاح، أو غيّر «المزود» إلى «معطّل (Null)» للاستمرار بدون استرجاع دلالي.
+                            </p>
+                        @elseif ($isAnthropicErr && $isKeyErr)
+                            <p class="text-sm text-red-700 mt-2">
+                                مفتاح Anthropic مرفوض أو غير مضبوط. افتح
+                                <a href="{{ route('settings.index') }}" class="text-lexa-700 hover:underline">الإعدادات → الذكاء الاصطناعي</a>
+                                وأدخل مفتاحاً صحيحاً ثم اختبر الاتصال.
+                            </p>
+                        @elseif ($isKeyErr)
+                            <p class="text-sm text-red-700 mt-2">
+                                مفتاح API مرفوض. راجع
+                                <a href="{{ route('settings.index') }}" class="text-lexa-700 hover:underline">الإعدادات</a>
+                                وتأكد من صحة مفاتيح Anthropic و Cohere.
                             </p>
                         @endif
                     </div>
