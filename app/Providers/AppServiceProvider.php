@@ -16,6 +16,8 @@ use Illuminate\Http\Client\Factory as HttpClient;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
+use Stancl\Tenancy\Middleware\InitializeTenancyByDomainOrSubdomain;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -52,5 +54,20 @@ class AppServiceProvider extends ServiceProvider
 
         // Observers
         Judgment::observe(JudgmentObserver::class);
+
+        // Livewire AJAX endpoints (`/livewire/update`, file uploads, etc.) are
+        // registered globally by the Livewire service provider, OUTSIDE our
+        // tenant route group. Without tenancy middleware on them, every
+        // Livewire round-trip runs with `tenant()` == null — which silently
+        // breaks anything that uses the active tenant (login auth scope,
+        // BelongsToTenant scope, etc.). Re-register the update route with
+        // the same identification middleware our tenant routes use.
+        Livewire::setUpdateRoute(function ($handle) {
+            return Route::post('/livewire/update', $handle)
+                ->middleware([
+                    'web',
+                    InitializeTenancyByDomainOrSubdomain::class,
+                ]);
+        });
     }
 }
