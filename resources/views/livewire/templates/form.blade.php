@@ -31,7 +31,7 @@
             <div>
                 <label class="block text-sm font-medium text-gray-700">جسم القالب</label>
                 <p class="text-xs text-gray-500 mb-1">
-                    استخدم <code class="bg-gray-100 px-1 rounded">{{ '{{token_name}}' }}</code> للحقول التي ستملأ عند التوليد.
+                    استخدم <code class="bg-gray-100 px-1 rounded">@{{token_name}}</code> للحقول التي ستملأ عند التوليد.
                 </p>
                 <textarea wire:model="body" rows="14"
                           class="mt-1 w-full rounded-md border-gray-300 shadow-sm font-mono text-sm" dir="rtl"></textarea>
@@ -40,9 +40,8 @@
 
             <div>
                 <label class="block text-sm font-medium text-gray-700">المتغيرات (JSON)</label>
-                <p class="text-xs text-gray-500 mb-1">
-                    مثال: <code class="bg-gray-100 px-1 rounded">[{{ '{"name":"party_a","label_ar":"الطرف الأول","type":"text","required":true}' }}]</code>
-                </p>
+                <p class="text-xs text-gray-500 mb-1">مثال (انسخ والصق):</p>
+                <pre class="bg-gray-100 px-2 py-1 rounded text-xs overflow-x-auto" dir="ltr">[@{{"name":"party_a","label_ar":"الطرف الأول","type":"text","required":true@}}]</pre>
                 <textarea wire:model="variables_json" rows="6"
                           class="mt-1 w-full rounded-md border-gray-300 shadow-sm font-mono text-xs"></textarea>
                 @error('variables_json') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror

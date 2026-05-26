@@ -16,7 +16,7 @@
         <div class="bg-white shadow-sm rounded-lg overflow-hidden">
             @if ($this->templates->isEmpty())
                 <p class="p-6 text-center text-gray-500">
-                    لا توجد قوالب بعد. ابدأ بإضافة قالب لعقد متكرر — استخدم <code class="bg-gray-100 px-1 rounded">{{ '{{name}}' }}</code> للحقول المتغيرة.
+                    لا توجد قوالب بعد. ابدأ بإضافة قالب لعقد متكرر — استخدم <code class="bg-gray-100 px-1 rounded">@{{name}}</code> للحقول المتغيرة.
                 </p>
             @else
                 <table class="w-full">
