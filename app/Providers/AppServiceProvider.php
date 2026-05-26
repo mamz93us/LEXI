@@ -12,7 +12,7 @@ use App\Observers\JudgmentObserver;
 use App\Services\Ai\AnthropicClient;
 use App\Services\Arabic\ArabicNormalizer;
 use App\Services\Embeddings\EmbeddingDriverManager;
-use Illuminate\Http\Client\Factory as HttpClient;
+use App\Services\Settings\SettingsService;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
@@ -23,18 +23,13 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        // Auto-resolution works for all of these — concrete classes with
+        // typed constructor deps. Bound as singletons so the request-scoped
+        // setting cache survives across the request.
+        $this->app->singleton(SettingsService::class);
         $this->app->singleton(ArabicNormalizer::class);
         $this->app->singleton(EmbeddingDriverManager::class);
-
-        $this->app->singleton(AnthropicClient::class, function ($app) {
-            return new AnthropicClient(
-                http: $app->make(HttpClient::class),
-                apiKey: (string) config('lexa.anthropic.api_key', ''),
-                model: (string) config('lexa.anthropic.model', 'claude-opus-4-7'),
-                zeroRetention: (bool) config('lexa.anthropic.zero_retention', true),
-                maxTokens: (int) config('lexa.anthropic.max_tokens', 4096),
-            );
-        });
+        $this->app->singleton(AnthropicClient::class);
     }
 
     public function boot(): void

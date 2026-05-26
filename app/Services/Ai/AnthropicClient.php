@@ -4,25 +4,26 @@ declare(strict_types=1);
 
 namespace App\Services\Ai;
 
+use App\Services\Settings\SettingsService;
 use Illuminate\Http\Client\Factory as HttpClient;
 use RuntimeException;
 
 /**
  * Thin wrapper around the Anthropic Messages API.
  *
- * Server-side only — never expose the key to the browser. Use the
- * zero-retention tier in production (set ANTHROPIC_ZERO_RETENTION=true)
- * so prompts and outputs are not used for training. Every call site
- * MUST log a corresponding row to `ai_generations` for audit.
+ * Server-side only — never expose the key to the browser. Reads the
+ * API key from the per-tenant Settings table at call time, with the
+ * `.env`-backed config as fallback. So the firm can rotate the key
+ * from Settings → AI without an SSH redeploy.
+ *
+ * Use the zero-retention tier in production. Every call site MUST log
+ * a corresponding row to `ai_generations` for audit.
  */
 final class AnthropicClient
 {
     public function __construct(
         private readonly HttpClient $http,
-        private readonly string $apiKey,
-        private readonly string $model,
-        private readonly bool $zeroRetention,
-        private readonly int $maxTokens,
+        private readonly SettingsService $settings,
     ) {}
 
     /**
@@ -30,15 +31,39 @@ final class AnthropicClient
      */
     public function sendMessages(string $systemPrompt, array $messages): string
     {
-        $this->assertConfigured();
+        $apiKey = (string) $this->settings->get(
+            'ai',
+            'anthropic_api_key',
+            config('lexa.anthropic.api_key', ''),
+        );
+
+        $model = (string) $this->settings->get(
+            'ai',
+            'anthropic_model',
+            config('lexa.anthropic.model', 'claude-opus-4-7'),
+        );
+
+        $zeroRetention = (bool) $this->settings->get(
+            'ai',
+            'anthropic_zero_retention',
+            config('lexa.anthropic.zero_retention', true),
+        );
+
+        $maxTokens = (int) $this->settings->get(
+            'ai',
+            'anthropic_max_tokens',
+            config('lexa.anthropic.max_tokens', 4096),
+        );
+
+        $this->assertConfigured($apiKey);
 
         $headers = [
-            'x-api-key' => $this->apiKey,
+            'x-api-key' => $apiKey,
             'anthropic-version' => '2023-06-01',
             'Content-Type' => 'application/json',
         ];
 
-        if ($this->zeroRetention) {
+        if ($zeroRetention) {
             // The exact opt-out header is configured per-org in the Anthropic
             // contract. Replace this name once Anthropic confirms the header
             // value for the firm's zero-retention agreement.
@@ -49,8 +74,8 @@ final class AnthropicClient
             ->withHeaders($headers)
             ->timeout(120)
             ->post('https://api.anthropic.com/v1/messages', [
-                'model' => $this->model,
-                'max_tokens' => $this->maxTokens,
+                'model' => $model,
+                'max_tokens' => $maxTokens,
                 'system' => $systemPrompt,
                 'messages' => $messages,
             ]);
@@ -72,12 +97,12 @@ final class AnthropicClient
         return $text;
     }
 
-    private function assertConfigured(): void
+    private function assertConfigured(string $apiKey): void
     {
-        if ($this->apiKey === '') {
+        if ($apiKey === '') {
             throw new RuntimeException(
-                'Anthropic API key not set. Configure ANTHROPIC_API_KEY in .env. '.
-                'See config/lexa.php and docs/DECISIONS.md for the zero-retention requirement.'
+                'Anthropic API key not set. Configure it from Settings → AI inside the app, '.
+                'or set ANTHROPIC_API_KEY in .env as a fallback.'
             );
         }
     }

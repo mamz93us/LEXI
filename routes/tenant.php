@@ -30,6 +30,7 @@ use App\Livewire\Proxies\Form as ProxyForm;
 use App\Livewire\Proxies\Index as ProxiesIndex;
 use App\Livewire\Serials\Form as SerialForm;
 use App\Livewire\Serials\Index as SerialsIndex;
+use App\Livewire\Settings\Index as SettingsIndex;
 use App\Livewire\Templates\Form as TemplateForm;
 use App\Livewire\Templates\Index as TemplatesIndex;
 use App\Livewire\TimeEntries\Form as TimeEntryForm;
@@ -135,6 +136,9 @@ Route::middleware([
         Route::get('invoices', InvoicesIndex::class)->name('invoices.index');
         Route::get('invoices/new', InvoiceForm::class)->name('invoices.create');
         Route::get('invoices/{invoice}/edit', InvoiceForm::class)->name('invoices.edit');
+
+        // --- Settings (admin / partner only — enforced inside the component) ---
+        Route::get('settings', SettingsIndex::class)->name('settings.index');
     });
 
     require __DIR__.'/auth.php';
