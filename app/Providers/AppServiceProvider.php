@@ -30,6 +30,48 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(ArabicNormalizer::class);
         $this->app->singleton(EmbeddingDriverManager::class);
         $this->app->singleton(AnthropicClient::class);
+
+        $this->silenceTempnamFallbackNotice();
+    }
+
+    /**
+     * PHP emits an E_NOTICE when `tempnam()` falls back to the system
+     * temp directory (because the requested directory is unwritable by
+     * the FPM user). Laravel's HandleExceptions converts that benign
+     * notice into a fatal ErrorException — and Laravel's AliasLoader
+     * happens to call `tempnam()` while generating real-time facades
+     * (which Livewire 3 uses for `Facades\Livewire\Features\
+     * SupportFileUploads\FileUploadController`). The result: any file
+     * upload on a fresh host with sub-optimal storage perms 500s with
+     * a cryptic stack trace.
+     *
+     * We install a tiny shim handler that silently swallows JUST that
+     * specific notice and lets everything else fall through to
+     * Laravel's normal exception conversion. The tempnam call itself
+     * still succeeds (the file IS created — in /tmp instead of our
+     * preferred cache dir), so the request completes. The system temp
+     * fallback is fine here because the facade stub is regenerated on
+     * every request that needs it anyway.
+     *
+     * This is a safety net — the right long-term fix is still to make
+     * sure storage/framework/cache is writable by the FPM user. But
+     * this stops a single permissions edge case from breaking uploads
+     * across every deploy target.
+     */
+    private function silenceTempnamFallbackNotice(): void
+    {
+        $previous = set_error_handler(function (int $severity, string $message, string $file, int $line) use (&$previous) {
+            $isTempnamFallback = $severity === E_NOTICE
+                && str_contains($message, 'tempnam(): file created in the system');
+
+            if ($isTempnamFallback) {
+                return true; // swallow, do not convert to exception
+            }
+
+            // Delegate to whatever handler we replaced (typically Laravel's
+            // HandleExceptions, which converts to ErrorException).
+            return $previous ? $previous($severity, $message, $file, $line) : false;
+        });
     }
 
     public function boot(): void

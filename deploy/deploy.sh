@@ -67,16 +67,19 @@ ${PHP_BIN} artisan db:seed --class=Database\\Seeders\\CaseTypeSeeder --force
 ${PHP_BIN} artisan db:seed --class=Database\\Seeders\\RequestTypeSeeder --force
 ${PHP_BIN} artisan db:seed --class=Database\\Seeders\\JudgmentTypeSeeder --force
 
-echo "==> [8/9] cache config / routes / views"
+echo "==> [8/10] cache config / routes / views"
 ${PHP_BIN} artisan config:cache
 ${PHP_BIN} artisan route:cache
 ${PHP_BIN} artisan view:cache
 ${PHP_BIN} artisan event:cache
 
 # Refresh permissions on writable dirs (cPanel sometimes resets these on restore).
-chmod -R u+rwX,g+rX storage bootstrap/cache
+chmod -R u+rwX,g+rwX storage bootstrap/cache
 
-echo "==> [9/9] restart Horizon worker (via supervisor)"
+echo "==> [9/10] warm real-time facade cache (so FPM never has to call tempnam)"
+${PHP_BIN} artisan lexa:warm-facades || echo "    !! Facade warming failed — uploads may 500 on first use. See WarmFacadesCommand."
+
+echo "==> [10/10] restart Horizon worker (via supervisor)"
 if command -v sudo >/dev/null 2>&1 && sudo -n supervisorctl restart lexa-horizon:* >/dev/null 2>&1; then
     echo "    Horizon worker restarted."
 else
