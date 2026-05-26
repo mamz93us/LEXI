@@ -39,7 +39,9 @@ class Detail extends Component
     #[Computed]
     public function chain(): Collection
     {
-        return $this->generation->chain()->loadMissing('reviewer');
+        // chain() returns a Support\Collection (built with collect()); the
+        // view only reads scalar fields, no eager-load needed.
+        return $this->generation->chain();
     }
 
     public function refineWithAi(RagGenerator $generator): void
