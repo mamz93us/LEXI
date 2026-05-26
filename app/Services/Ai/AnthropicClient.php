@@ -34,7 +34,41 @@ final class AnthropicClient
     ) {}
 
     /**
-     * @param  array<int, array{role:string, content:string}>  $messages
+     * Multimodal variant — accepts a single user prompt + an array of files
+     * (each `{ data: bytes, mime: string }`) and sends them to Claude.
+     * Used by the proxy upload feature to OCR / extract structured data
+     * straight from a PDF or JPG without needing Tesseract on the server.
+     *
+     * Claude 3.5+ Sonnet and Opus 4+ accept PDF and image inputs natively.
+     * Each file becomes a `document` (PDF) or `image` (JPG/PNG/WebP/GIF)
+     * content block in the user turn.
+     *
+     * @param  array<int, array{data: string, mime: string}>  $files
+     */
+    public function sendMessagesWithFiles(string $systemPrompt, string $userPrompt, array $files): string
+    {
+        $content = [];
+        foreach ($files as $file) {
+            $mime = strtolower((string) ($file['mime'] ?? ''));
+            $isImage = str_starts_with($mime, 'image/');
+            $content[] = [
+                'type' => $isImage ? 'image' : 'document',
+                'source' => [
+                    'type' => 'base64',
+                    'media_type' => $mime,
+                    'data' => base64_encode((string) $file['data']),
+                ],
+            ];
+        }
+        $content[] = ['type' => 'text', 'text' => $userPrompt];
+
+        return $this->sendMessages($systemPrompt, [
+            ['role' => 'user', 'content' => $content],
+        ]);
+    }
+
+    /**
+     * @param  array<int, array{role:string, content:string|array}>  $messages
      */
     public function sendMessages(string $systemPrompt, array $messages): string
     {

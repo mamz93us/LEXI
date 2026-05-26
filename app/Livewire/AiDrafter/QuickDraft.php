@@ -9,6 +9,7 @@ use App\Models\ClauseVersion;
 use App\Models\Client;
 use App\Models\Court;
 use App\Models\LegalCase;
+use App\Models\Proxy;
 use App\Services\Rag\LegalDraftDiscovery;
 use App\Services\Rag\RagGenerator;
 use App\Services\Templates\DocumentTypeRegistry;
@@ -61,6 +62,13 @@ class QuickDraft extends Component
     /** Optional linked case for audit / context. */
     public ?int $case_id = null;
 
+    /**
+     * Optional linked proxy whose AI-extracted data feeds the form.
+     * Selecting one auto-fills the principal/agent (or whichever parties
+     * the proxy carries) plus `proxy.*` tokens like notary_serial, scope.
+     */
+    public ?int $linked_proxy_id = null;
+
     public ?string $error = null;
 
     public ?string $info = null;
@@ -102,6 +110,30 @@ class QuickDraft extends Component
     public function casesList(): Collection
     {
         return LegalCase::query()->orderByDesc('created_at')->limit(200)->get();
+    }
+
+    /**
+     * Proxies that have a file uploaded — extracted or not. We only show
+     * extracted ones in the picker, since their `toAiVariables()` is
+     * meaningful. A pending/extracting proxy is shown as disabled.
+     */
+    #[Computed]
+    public function linkableProxies(): Collection
+    {
+        return Proxy::query()
+            ->with('client')
+            ->whereNotNull('file_path')
+            ->orderByDesc('created_at')
+            ->limit(200)
+            ->get();
+    }
+
+    #[Computed]
+    public function linkedProxy(): ?Proxy
+    {
+        return $this->linked_proxy_id
+            ? Proxy::query()->with('client')->find($this->linked_proxy_id)
+            : null;
     }
 
     #[Computed]
@@ -233,10 +265,24 @@ class QuickDraft extends Component
             ->map(fn ($versions) => $versions->sortByDesc('version_no')->first())
             ->values();
 
+        $extras = $this->extra_fields;
+
+        // If the lawyer linked an existing proxy, fold its AI-extracted
+        // tokens (proxy.notary_serial, proxy.scope, plus any party fields
+        // that weren't already filled by the form pickers) into the data.
+        // Form-side party selections win — `$extras` is only a fallback.
+        if ($this->linkedProxy) {
+            foreach ($this->linkedProxy->toAiVariables() as $key => $value) {
+                if (! array_key_exists($key, $extras) || $extras[$key] === null || $extras[$key] === '') {
+                    $extras[$key] = $value;
+                }
+            }
+        }
+
         $resolved = $resolver->resolve(
             parties: $this->parties,
             contractMeta: $this->contract_meta,
-            extra: $this->extra_fields,
+            extra: $extras,
         );
 
         $intent = sprintf(

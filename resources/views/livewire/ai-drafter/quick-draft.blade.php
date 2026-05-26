@@ -60,6 +60,29 @@
                     </select>
                 </div>
 
+                @if ($this->linkableProxies->isNotEmpty())
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            استخدم بيانات توكيل قائم (اختياري)
+                        </label>
+                        <p class="text-xs text-gray-500 mb-2">
+                            عند الاختيار، تُملأ بيانات الموكِّل/الوكيل + رقم التوثيق + النطاق تلقائياً من التوكيل الذي رفعته سابقاً.
+                        </p>
+                        <select wire:model.live="linked_proxy_id" class="w-full rounded-md border-gray-300 shadow-sm">
+                            <option value="">— بدون توكيل مرتبط —</option>
+                            @foreach ($this->linkableProxies as $p)
+                                <option value="{{ $p->id }}" @if ($p->extraction_status !== 'extracted') disabled @endif>
+                                    {{ $p->client?->name_ar ?: $p->client?->name }} —
+                                    {{ $p->notary_serial ?: 'بدون رقم توثيق' }}
+                                    @if ($p->extraction_status !== 'extracted')
+                                        ({{ ['pending' => 'ينتظر…', 'extracting' => 'جاري…', 'failed' => 'فشل'][$p->extraction_status] ?? '—' }})
+                                    @endif
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
+
                 <div class="flex justify-end gap-3 pt-4 border-t">
                     <a href="{{ route('ai-drafter.index') }}" wire:navigate
                        class="px-4 py-2 text-sm text-gray-700 hover:text-gray-900">إلغاء</a>

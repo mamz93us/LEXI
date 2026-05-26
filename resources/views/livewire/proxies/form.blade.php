@@ -73,7 +73,79 @@
                 </select>
             </div>
 
-            <div class="flex justify-end gap-3 pt-4">
+            {{-- ===== File upload + AI extraction ===== --}}
+            <div class="border-t pt-4">
+                <h3 class="text-sm font-semibold text-gray-900 mb-2">
+                    صورة التوكيل الأصلي (اختياري)
+                </h3>
+                <p class="text-xs text-gray-500 mb-3">
+                    ارفع صورة (JPG/PNG) أو ملف PDF للتوكيل الأصلي. سيقرأه المساعد القانوني ويستخرج البيانات تلقائياً (اسم الموكّل والوكيل، الرقم القومي، رقم التوثيق، نطاق التوكيل) لتستخدمها في الصياغة التالية.
+                </p>
+
+                @if ($proxy && $proxy->file_path)
+                    <div class="mb-3 p-3 bg-gray-50 border rounded-md text-sm">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <div class="font-medium text-gray-900">📎 ملف مرفق</div>
+                                <div class="text-xs text-gray-500 mt-1">{{ basename($proxy->file_path) }}</div>
+                            </div>
+                            @php
+                                $extractStatusLabels = [
+                                    'pending' => ['ينتظر الاستخراج…', 'bg-blue-100 text-blue-800 animate-pulse'],
+                                    'extracting' => ['جاري قراءة الوثيقة…', 'bg-blue-100 text-blue-800 animate-pulse'],
+                                    'extracted' => ['تم استخراج البيانات ✓', 'bg-green-100 text-green-800'],
+                                    'failed' => ['فشل الاستخراج', 'bg-red-100 text-red-800'],
+                                ];
+                                $stat = $extractStatusLabels[$proxy->extraction_status] ?? null;
+                            @endphp
+                            @if ($stat)
+                                <span class="text-xs px-2 py-1 rounded {{ $stat[1] }}">{{ $stat[0] }}</span>
+                            @endif
+                        </div>
+
+                        @if ($proxy->extraction_status === 'extracted' && is_array($proxy->extracted_data))
+                            <div class="mt-3 pt-3 border-t text-xs">
+                                <p class="font-medium text-gray-700 mb-1">البيانات المستخرجة:</p>
+                                @if (! empty($proxy->extracted_data['parties']['principal']['name']))
+                                    <p>الموكِّل: <strong>{{ $proxy->extracted_data['parties']['principal']['name'] }}</strong>
+                                        @if (! empty($proxy->extracted_data['parties']['principal']['national_id']))
+                                            ({{ $proxy->extracted_data['parties']['principal']['national_id'] }})
+                                        @endif
+                                    </p>
+                                @endif
+                                @if (! empty($proxy->extracted_data['parties']['agent']['name']))
+                                    <p>الوكيل: <strong>{{ $proxy->extracted_data['parties']['agent']['name'] }}</strong>
+                                        @if (! empty($proxy->extracted_data['parties']['agent']['national_id']))
+                                            ({{ $proxy->extracted_data['parties']['agent']['national_id'] }})
+                                        @endif
+                                    </p>
+                                @endif
+                                @if (! empty($proxy->extracted_data['proxy']['notary_office']))
+                                    <p>مكتب التوثيق: {{ $proxy->extracted_data['proxy']['notary_office'] }}</p>
+                                @endif
+                                @if (! empty($proxy->extracted_data['subject_property']))
+                                    <p>موضوع التوكيل: {{ $proxy->extracted_data['subject_property'] }}</p>
+                                @endif
+                            </div>
+                        @elseif ($proxy->extraction_status === 'failed' && $proxy->extracted_text)
+                            <div class="mt-3 pt-3 border-t">
+                                <p class="text-xs text-red-700 font-mono whitespace-pre-wrap">{{ $proxy->extracted_text }}</p>
+                            </div>
+                        @endif
+                    </div>
+                @endif
+
+                <input type="file" wire:model="upload"
+                       accept="application/pdf,image/jpeg,image/png,image/webp"
+                       class="block w-full text-sm text-gray-700 file:me-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-lexa-50 file:text-lexa-700 hover:file:bg-lexa-100" />
+                <div wire:loading wire:target="upload" class="mt-1 text-xs text-gray-500">جاري رفع الملف…</div>
+                @error('upload') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+                @if ($upload)
+                    <p class="mt-1 text-xs text-green-700">✓ تم اختيار: {{ $upload->getClientOriginalName() }} ({{ round($upload->getSize() / 1024) }} KB) — سيُحلل بعد الحفظ.</p>
+                @endif
+            </div>
+
+            <div class="flex justify-end gap-3 pt-4 border-t">
                 <a href="{{ route('proxies.index') }}" wire:navigate
                    class="px-4 py-2 text-sm text-gray-700 hover:text-gray-900">{{ __('Cancel') }}</a>
                 <button type="submit"
