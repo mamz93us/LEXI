@@ -112,31 +112,73 @@
             @if (! empty($this->partiesToFill))
                 <div class="bg-white shadow-sm rounded-lg p-6">
                     <h3 class="text-lg font-semibold text-gray-900 mb-1">الأطراف</h3>
-                    <p class="text-xs text-gray-500 mb-4">اختر العميل لكل طرف — ستُملأ بياناته الكاملة (اسم، رقم قومي، عنوان، جنسية، ديانة، مهنة) تلقائياً.</p>
+                    <p class="text-xs text-gray-500 mb-4">
+                        اختر العميل لكل طرف — ستُملأ بياناته الكاملة (اسم، رقم قومي، عنوان، جنسية، ديانة، مهنة) تلقائياً.
+                        للوكيل في التوكيلات يمكنك اختياره من محاميي المكتب بدلاً من العملاء.
+                    </p>
                     <div class="space-y-3">
                         @foreach ($this->partiesToFill as $p)
                             @php
-                                $selectedId = $parties[$p['namespace']] ?? null;
-                                $selected = $selectedId ? $this->clientsList->firstWhere('id', (int) $selectedId) : null;
+                                $ns = $p['namespace'];
+                                $kind = $parties_kind[$ns] ?? 'client';
+                                $selectedId = $parties[$ns] ?? null;
+                                $selectedClient = ($kind === 'client' && $selectedId)
+                                    ? $this->clientsList->firstWhere('id', (int) $selectedId)
+                                    : null;
+                                $selectedLawyer = ($kind === 'lawyer' && $selectedId)
+                                    ? $this->lawyersList->firstWhere('id', (int) $selectedId)
+                                    : null;
                             @endphp
                             <div class="border rounded-md p-3 bg-gray-50">
-                                <label class="block text-sm font-medium text-gray-700 mb-1">{{ $p['label_ar'] }}</label>
-                                <select wire:model.live="parties.{{ $p['namespace'] }}"
-                                        class="w-full rounded-md border-gray-300 shadow-sm">
-                                    <option value="">— اختر عميلاً —</option>
-                                    @foreach ($this->clientsList as $cl)
-                                        <option value="{{ $cl->id }}">
-                                            {{ $cl->name_ar ?: $cl->name }}@if ($cl->national_id) — {{ $cl->national_id }} @endif
-                                        </option>
-                                    @endforeach
-                                </select>
-                                @if ($selected)
-                                    <div class="mt-2 text-xs text-gray-600 space-y-0.5">
-                                        @if ($selected->national_id) <div>الرقم القومي: <code>{{ $selected->national_id }}</code></div> @endif
-                                        @if ($selected->type === 'company') <div class="text-amber-700">نوع العميل: شركة</div> @endif
-                                        <a href="{{ route('clients.edit', $selected->id) }}" target="_blank"
-                                           class="text-lexa-700 hover:underline">عرض/تعديل بيانات العميل ↗</a>
+                                <div class="flex items-baseline justify-between mb-1">
+                                    <label class="block text-sm font-medium text-gray-700">{{ $p['label_ar'] }}</label>
+                                    <div class="text-xs space-x-2 space-x-reverse">
+                                        <label class="inline-flex items-center gap-1 cursor-pointer">
+                                            <input type="radio" wire:model.live="parties_kind.{{ $ns }}" value="client" class="border-gray-300" />
+                                            <span>من العملاء</span>
+                                        </label>
+                                        <label class="inline-flex items-center gap-1 cursor-pointer">
+                                            <input type="radio" wire:model.live="parties_kind.{{ $ns }}" value="lawyer" class="border-gray-300" />
+                                            <span>من محاميي المكتب</span>
+                                        </label>
                                     </div>
+                                </div>
+
+                                @if ($kind === 'lawyer')
+                                    <select wire:model.live="parties.{{ $ns }}"
+                                            class="w-full rounded-md border-gray-300 shadow-sm">
+                                        <option value="">— اختر محامياً —</option>
+                                        @foreach ($this->lawyersList as $u)
+                                            <option value="{{ $u->id }}">
+                                                {{ $u->name }}@if ($u->email) — {{ $u->email }} @endif
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @if ($selectedLawyer)
+                                        <div class="mt-2 text-xs text-gray-600 space-y-0.5">
+                                            <div>محامي بالمكتب · {{ $selectedLawyer->name }}</div>
+                                            @if ($selectedLawyer->phone) <div>الهاتف: <code>{{ $selectedLawyer->phone }}</code></div> @endif
+                                            <div class="text-amber-700">ملاحظة: الرقم القومي والعنوان غير متوفرين في ملف المحامي — سيُترك مكانهما فارغاً ليكمله المراجع.</div>
+                                        </div>
+                                    @endif
+                                @else
+                                    <select wire:model.live="parties.{{ $ns }}"
+                                            class="w-full rounded-md border-gray-300 shadow-sm">
+                                        <option value="">— اختر عميلاً —</option>
+                                        @foreach ($this->clientsList as $cl)
+                                            <option value="{{ $cl->id }}">
+                                                {{ $cl->name_ar ?: $cl->name }}@if ($cl->national_id) — {{ $cl->national_id }} @endif
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @if ($selectedClient)
+                                        <div class="mt-2 text-xs text-gray-600 space-y-0.5">
+                                            @if ($selectedClient->national_id) <div>الرقم القومي: <code>{{ $selectedClient->national_id }}</code></div> @endif
+                                            @if ($selectedClient->type === 'company') <div class="text-amber-700">نوع العميل: شركة</div> @endif
+                                            <a href="{{ route('clients.edit', $selectedClient->id) }}" target="_blank"
+                                               class="text-lexa-700 hover:underline">عرض/تعديل بيانات العميل ↗</a>
+                                        </div>
+                                    @endif
                                 @endif
                             </div>
                         @endforeach

@@ -10,6 +10,7 @@ use App\Models\Client;
 use App\Models\Court;
 use App\Models\LegalCase;
 use App\Models\Proxy;
+use App\Models\User;
 use App\Services\Rag\LegalDraftDiscovery;
 use App\Services\Rag\RagGenerator;
 use App\Services\Templates\DocumentTypeRegistry;
@@ -49,6 +50,16 @@ class QuickDraft extends Component
 
     /** namespace → client id  (catalog parties) */
     public array $parties = [];
+
+    /**
+     * namespace → 'client' | 'lawyer'
+     * For توكيلات the agent (الوكيل) is frequently a lawyer in the firm
+     * rather than a separate client. This tracks which directory to
+     * resolve from when generating.
+     *
+     * @var array<string, string>
+     */
+    public array $parties_kind = [];
 
     /** dotted-key → value  (catalog contract.* / court.* etc.) */
     public array $contract_meta = [];
@@ -104,6 +115,19 @@ class QuickDraft extends Component
             ->orderBy('governorate')
             ->orderBy('name_ar')
             ->get(['id', 'name_ar', 'name_en', 'governorate']);
+    }
+
+    /**
+     * Firm lawyers — anyone in the users table for this tenant. The agent
+     * dropdown can flip to this source when the lawyer is acting as
+     * authorised representative on a توكيل.
+     */
+    #[Computed]
+    public function lawyersList(): Collection
+    {
+        return User::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'phone']);
     }
 
     #[Computed]
@@ -206,25 +230,20 @@ class QuickDraft extends Component
             return;
         }
 
+        // Build the "already-known" payload from the linked proxy so Claude
+        // doesn't ask the lawyer for fields that are already extracted.
+        $existingData = [];
+        if ($this->linkedProxy) {
+            $existingData = $this->linkedProxy->toAiVariables();
+        }
+
         $this->discovering = true;
         try {
-            $this->discovery = $discovery->discover($this->doc_type, $this->description);
+            $this->discovery = $discovery->discover($this->doc_type, $this->description, $existingData);
             $this->step = 2;
-            // Pre-seed party keys so wire:model bindings work on step 2.
-            foreach ($this->partiesToFill as $p) {
-                if (! array_key_exists($p['namespace'], $this->parties)) {
-                    $this->parties[$p['namespace']] = null;
-                }
-            }
-            foreach ($this->contractMetaToFill as $m) {
-                if (! array_key_exists($m['token'], $this->contract_meta)) {
-                    $this->contract_meta[$m['token']] = '';
-                }
-            }
-            foreach ($this->discovery['fields'] ?? [] as $f) {
-                if (! array_key_exists($f['key'], $this->extra_fields)) {
-                    $this->extra_fields[$f['key']] = '';
-                }
+            $this->seedFormKeys();
+            if ($this->linkedProxy) {
+                $this->prefillFromLinkedProxy();
             }
         } catch (Throwable $e) {
             $this->error = 'تعذّر استكشاف البيانات المطلوبة: '.$e->getMessage();
@@ -233,9 +252,107 @@ class QuickDraft extends Component
         }
     }
 
+    /**
+     * Seed the wire:model arrays with empty values so Livewire bindings
+     * resolve. Called once when entering step 2.
+     */
+    private function seedFormKeys(): void
+    {
+        foreach ($this->partiesToFill as $p) {
+            $ns = $p['namespace'];
+            if (! array_key_exists($ns, $this->parties)) {
+                $this->parties[$ns] = null;
+            }
+            if (! array_key_exists($ns, $this->parties_kind)) {
+                $this->parties_kind[$ns] = 'client';
+            }
+        }
+        foreach ($this->contractMetaToFill as $m) {
+            if (! array_key_exists($m['token'], $this->contract_meta)) {
+                $this->contract_meta[$m['token']] = '';
+            }
+        }
+        foreach ($this->discovery['fields'] ?? [] as $f) {
+            if (! array_key_exists($f['key'], $this->extra_fields)) {
+                $this->extra_fields[$f['key']] = '';
+            }
+        }
+    }
+
+    /**
+     * When the lawyer has linked an existing proxy, try to match each
+     * extracted party (by national_id) to a Client row so the dropdowns
+     * land pre-selected. Also copy the proxy's `proxy.*` tokens into
+     * `extra_fields` so Claude doesn't re-ask for notary serial, scope,
+     * etc. — the prompt told it not to, but defense in depth.
+     */
+    private function prefillFromLinkedProxy(): void
+    {
+        $proxy = $this->linkedProxy;
+        if (! $proxy) {
+            return;
+        }
+        $extracted = is_array($proxy->extracted_data) ? $proxy->extracted_data : [];
+
+        foreach (($extracted['parties'] ?? []) as $ns => $fields) {
+            if (! is_string($ns) || ! is_array($fields)) {
+                continue;
+            }
+            // Only pre-fill if the form actually renders this party.
+            $renderedNamespaces = array_column($this->partiesToFill, 'namespace');
+            if (! in_array($ns, $renderedNamespaces, true)) {
+                continue;
+            }
+
+            // Skip if the lawyer has already picked something for this party.
+            if (! empty($this->parties[$ns])) {
+                continue;
+            }
+
+            $nid = $fields['national_id'] ?? null;
+            if ($nid) {
+                $client = Client::query()->where('national_id', $nid)->first();
+                if ($client) {
+                    $this->parties[$ns] = $client->id;
+
+                    continue;
+                }
+            }
+
+            // Fallback: match by Arabic name if no NID hit.
+            $name = $fields['name'] ?? null;
+            if ($name) {
+                $client = Client::query()->where('name_ar', $name)->first();
+                if ($client) {
+                    $this->parties[$ns] = $client->id;
+                }
+            }
+        }
+
+        // Fold proxy.* tokens into extra_fields so the AI sees them and
+        // the lawyer doesn't have to retype anything.
+        foreach ($proxy->toAiVariables() as $key => $value) {
+            if (str_starts_with($key, 'proxy.') &&
+                (! array_key_exists($key, $this->extra_fields) || empty($this->extra_fields[$key]))
+            ) {
+                $this->extra_fields[$key] = (string) $value;
+            }
+        }
+    }
+
     public function back(): void
     {
         $this->step = max(1, $this->step - 1);
+    }
+
+    /**
+     * Livewire hook: when the lawyer flips the "from clients / from
+     * lawyers" radio for a party, clear the previously-selected ID since
+     * it refers to a row in the OTHER table.
+     */
+    public function updatedPartiesKind(mixed $value, string $key): void
+    {
+        $this->parties[$key] = null;
     }
 
     public function generate(RagGenerator $generator, VariableResolver $resolver): void
@@ -283,6 +400,7 @@ class QuickDraft extends Component
             parties: $this->parties,
             contractMeta: $this->contract_meta,
             extra: $extras,
+            partiesKind: $this->parties_kind,
         );
 
         $intent = sprintf(

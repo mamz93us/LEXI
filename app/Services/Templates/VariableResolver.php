@@ -6,6 +6,7 @@ namespace App\Services\Templates;
 
 use App\Models\Client;
 use App\Models\Court;
+use App\Models\User;
 use Illuminate\Support\Carbon;
 
 /**
@@ -25,25 +26,31 @@ use Illuminate\Support\Carbon;
 final class VariableResolver
 {
     /**
-     * @param  array<string, int|string|null>  $parties  namespace → client id
+     * @param  array<string, int|string|null>  $parties  namespace → row id
      * @param  array<string, mixed>  $contractMeta  contract.* / court.* / firm.* tokens
      * @param  array<string, mixed>  $extra  passthrough extras (legacy filled vars)
+     * @param  array<string, string>  $partiesKind  namespace → 'client' | 'lawyer'
+     *                                              (defaults to 'client' if unset)
      * @return array<string, scalar|null> flat dotted-key → value map
      */
-    public function resolve(array $parties, array $contractMeta, array $extra = []): array
+    public function resolve(array $parties, array $contractMeta, array $extra = [], array $partiesKind = []): array
     {
         $out = [];
 
-        foreach ($parties as $namespace => $clientId) {
-            if (! $clientId) {
+        foreach ($parties as $namespace => $rowId) {
+            if (! $rowId) {
                 continue;
             }
+            $kind = $partiesKind[$namespace] ?? 'client';
             // BelongsToTenant scope auto-filters; a foreign tenant's id will not resolve.
-            $client = Client::query()->find($clientId);
-            if (! $client) {
+            $source = match ($kind) {
+                'lawyer' => User::query()->find($rowId),
+                default => Client::query()->find($rowId),
+            };
+            if (! $source) {
                 continue;
             }
-            foreach ($client->toAiVariables() as $field => $value) {
+            foreach ($source->toAiVariables() as $field => $value) {
                 $out["{$namespace}.{$field}"] = $value;
             }
         }

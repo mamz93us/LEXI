@@ -40,6 +40,10 @@ final class LegalDraftDiscovery
     ) {}
 
     /**
+     * @param  array<string, mixed>  $existingData  flat dotted-key map of values
+     *                                              the lawyer ALREADY has (e.g.
+     *                                              from a linked proxy). Claude
+     *                                              is told to skip these.
      * @return array{
      *     parties: array<int, array{namespace: string, label_ar: string}>,
      *     fields: array<int, array{key: string, label_ar: string, type: string, required: bool}>,
@@ -48,7 +52,7 @@ final class LegalDraftDiscovery
      *     raw: string
      * }
      */
-    public function discover(string $docType, string $description): array
+    public function discover(string $docType, string $description, array $existingData = []): array
     {
         $typeMeta = DocumentTypeRegistry::get($docType);
         if (! $typeMeta) {
@@ -58,6 +62,15 @@ final class LegalDraftDiscovery
         $knownParties = implode(', ', array_keys(VariableCatalog::PARTIES));
         $defaultParties = $typeMeta['parties'] ? implode(', ', $typeMeta['parties']) : '(none)';
         $defaultMeta = implode(', ', $typeMeta['contract_meta']);
+
+        $existingBlock = '';
+        if (! empty($existingData)) {
+            $lines = collect($existingData)
+                ->filter(fn ($v) => $v !== null && $v !== '')
+                ->map(fn ($v, $k) => "- {$k}: ".(is_scalar($v) ? (string) $v : json_encode($v, JSON_UNESCAPED_UNICODE)))
+                ->implode("\n");
+            $existingBlock = "\n\nبيانات متوفرة لديّ بالفعل (من توكيل سابق مرفق أو مصدر آخر) — لا تطلب هذه الحقول مرة أخرى:\n{$lines}\n";
+        }
 
         $system = <<<TXT
 أنت مساعد صياغة قانوني مصري متخصص. مهمتك في هذه المرحلة هي تحديد البيانات اللازمة لصياغة وثيقة قانونية، وليس صياغتها.
@@ -95,8 +108,8 @@ TXT;
 
 وصف الطلب من المحامي:
 {$description}
-
-حدد ما تحتاجه فعلاً لصياغة هذه الوثيقة كـ JSON.
+{$existingBlock}
+حدد ما تحتاجه فعلاً لصياغة هذه الوثيقة كـ JSON. اقتصر على الحقول الإضافية التي لم تُذكر بالفعل في "البيانات المتوفرة" أعلاه.
 TXT;
 
         $raw = $this->anthropic->sendMessages($system, [
