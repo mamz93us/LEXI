@@ -97,8 +97,9 @@ class Form extends Component
             'lawyer_ids.*' => ['integer', 'exists:users,id'],
             'case_ids' => ['array'],
             'case_ids.*' => ['integer', 'exists:cases,id'],
-            // 10 MB max — typical scanned توكيل is ~1-3 MB.
-            'upload' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,webp'],
+            // 50 MB max — scanned multi-page توكيلات from الشهر العقاري
+            // can run 20-30+ MB at decent OCR quality.
+            'upload' => ['nullable', 'file', 'max:51200', 'mimes:pdf,jpg,jpeg,png,webp'],
         ];
     }
 

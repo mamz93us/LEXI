@@ -83,6 +83,13 @@ class AppServiceProvider extends ServiceProvider
             URL::forceScheme('https');
         }
 
+        // Livewire enforces its own max-size rule on temporary uploads
+        // BEFORE our component's rules() run — the default is 12 MB.
+        // Scanned توكيل PDFs can easily run 15–30 MB, so raise to 50 MB.
+        // Per-component validation (e.g. proxies/Form.php) can still
+        // tighten it lower if needed.
+        config(['livewire.temporary_file_upload.rules' => ['required', 'file', 'max:51200']]);
+
         // Route model bindings for params that don't match a model class name.
         Route::model('case', LegalCase::class);
         Route::model('client', Client::class);
