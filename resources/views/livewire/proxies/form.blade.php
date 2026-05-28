@@ -104,27 +104,121 @@
                         </div>
 
                         @if ($proxy->extraction_status === 'extracted' && is_array($proxy->extracted_data))
-                            <div class="mt-3 pt-3 border-t text-xs">
-                                <p class="font-medium text-gray-700 mb-1">البيانات المستخرجة:</p>
-                                @if (! empty($proxy->extracted_data['parties']['principal']['name']))
-                                    <p>الموكِّل: <strong>{{ $proxy->extracted_data['parties']['principal']['name'] }}</strong>
-                                        @if (! empty($proxy->extracted_data['parties']['principal']['national_id']))
-                                            ({{ $proxy->extracted_data['parties']['principal']['national_id'] }})
-                                        @endif
-                                    </p>
+                            @php
+                                $extractedProxy = $proxy->extracted_data['proxy'] ?? [];
+                                $extractedParties = $proxy->extracted_data['parties'] ?? [];
+                                $extractedWitnesses = $proxy->extracted_data['witnesses'] ?? [];
+                                $extractedSubject = $proxy->extracted_data['subject_property'] ?? null;
+                                $partyLabels = [
+                                    'principal' => 'الموكِّل',
+                                    'agent' => 'الوكيل',
+                                    'seller' => 'البائع', 'buyer' => 'المشتري',
+                                    'lessor' => 'المؤجر', 'lessee' => 'المستأجر',
+                                ];
+                                $fieldLabels = [
+                                    'name' => 'الاسم',
+                                    'national_id' => 'الرقم القومي',
+                                    'address' => 'العنوان',
+                                    'phone' => 'الهاتف',
+                                    'email' => 'البريد',
+                                    'nationality' => 'الجنسية',
+                                    'religion' => 'الديانة',
+                                    'profession' => 'المهنة',
+                                    'date_of_birth' => 'تاريخ الميلاد',
+                                    'commercial_register_no' => 'السجل التجاري',
+                                ];
+                            @endphp
+
+                            <div class="mt-4 pt-3 border-t">
+                                <div class="flex items-center justify-between mb-3">
+                                    <p class="font-semibold text-gray-900 text-sm">البيانات المستخرجة بواسطة المساعد القانوني</p>
+                                    <button type="button" wire:click="applyExtractedData" wire:confirm="استبدال الحقول الفارغة بالبيانات المستخرجة (لن نستبدل ما ملأته يدوياً)؟"
+                                            class="text-xs px-2 py-1 bg-lexa-600 hover:bg-lexa-700 text-white rounded">
+                                        تطبيق البيانات على الحقول ←
+                                    </button>
+                                </div>
+
+                                {{-- Proxy metadata --}}
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs mb-4 bg-white rounded p-3 border">
+                                    @if (! empty($extractedProxy['type']))
+                                        <div><span class="text-gray-500">نوع التوكيل:</span> <strong>{{ $extractedProxy['type'] === 'general' ? 'عام' : 'خاص' }}</strong></div>
+                                    @endif
+                                    @if (! empty($extractedProxy['notary_serial']))
+                                        <div><span class="text-gray-500">رقم التوثيق:</span> <strong>{{ $extractedProxy['notary_serial'] }}</strong></div>
+                                    @endif
+                                    @if (! empty($extractedProxy['notary_office']))
+                                        <div class="sm:col-span-2"><span class="text-gray-500">مكتب التوثيق:</span> <strong>{{ $extractedProxy['notary_office'] }}</strong></div>
+                                    @endif
+                                    @if (! empty($extractedProxy['issue_date']))
+                                        <div><span class="text-gray-500">تاريخ الإصدار:</span> <strong>{{ $extractedProxy['issue_date'] }}</strong></div>
+                                    @endif
+                                    @if (! empty($extractedProxy['expiry_date']))
+                                        <div><span class="text-gray-500">تاريخ الانتهاء:</span> <strong>{{ $extractedProxy['expiry_date'] }}</strong></div>
+                                    @endif
+                                    @if (! empty($extractedProxy['scope']))
+                                        <div class="sm:col-span-2 pt-1 border-t mt-1">
+                                            <span class="text-gray-500">نطاق التوكيل / الصلاحيات:</span>
+                                            <p class="mt-1" dir="rtl">{{ $extractedProxy['scope'] }}</p>
+                                        </div>
+                                    @endif
+                                </div>
+
+                                {{-- Parties (principal + agent + anything else Claude found) --}}
+                                @if (! empty($extractedParties))
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                                        @foreach ($extractedParties as $ns => $fields)
+                                            @continue(! is_array($fields) || empty(array_filter($fields)))
+                                            <div class="bg-white rounded p-3 border">
+                                                <p class="text-xs font-semibold text-lexa-700 mb-2">{{ $partyLabels[$ns] ?? $ns }}</p>
+                                                <dl class="space-y-1 text-xs">
+                                                    @foreach ($fields as $field => $value)
+                                                        @continue(empty($value))
+                                                        <div class="flex">
+                                                            <dt class="text-gray-500 w-28 flex-shrink-0">{{ $fieldLabels[$field] ?? $field }}:</dt>
+                                                            <dd class="text-gray-900 flex-1" dir="rtl">{{ $value }}</dd>
+                                                        </div>
+                                                    @endforeach
+                                                </dl>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <div class="bg-amber-50 border-s-4 border-amber-400 p-2 text-xs text-amber-800 mb-3">
+                                        لم يتمكن المساعد من التعرف على الأطراف بوضوح. راجع نص الوثيقة أدناه وأدخل بياناتهم يدوياً.
+                                    </div>
                                 @endif
-                                @if (! empty($proxy->extracted_data['parties']['agent']['name']))
-                                    <p>الوكيل: <strong>{{ $proxy->extracted_data['parties']['agent']['name'] }}</strong>
-                                        @if (! empty($proxy->extracted_data['parties']['agent']['national_id']))
-                                            ({{ $proxy->extracted_data['parties']['agent']['national_id'] }})
-                                        @endif
-                                    </p>
+
+                                {{-- Subject property --}}
+                                @if ($extractedSubject)
+                                    <div class="bg-white rounded p-3 border text-xs mb-4">
+                                        <p class="text-gray-500 mb-1">موضوع التوكيل (تفاصيل):</p>
+                                        <p dir="rtl">{{ $extractedSubject }}</p>
+                                    </div>
                                 @endif
-                                @if (! empty($proxy->extracted_data['proxy']['notary_office']))
-                                    <p>مكتب التوثيق: {{ $proxy->extracted_data['proxy']['notary_office'] }}</p>
+
+                                {{-- Witnesses --}}
+                                @if (! empty($extractedWitnesses))
+                                    <div class="bg-white rounded p-3 border text-xs mb-4">
+                                        <p class="text-gray-500 font-medium mb-1">الشهود:</p>
+                                        <ol class="ms-5 list-decimal space-y-0.5">
+                                            @foreach ($extractedWitnesses as $w)
+                                                <li>
+                                                    {{ $w['name'] ?? '—' }}
+                                                    @if (! empty($w['national_id'])) <span class="text-gray-500">({{ $w['national_id'] }})</span> @endif
+                                                </li>
+                                            @endforeach
+                                        </ol>
+                                    </div>
                                 @endif
-                                @if (! empty($proxy->extracted_data['subject_property']))
-                                    <p>موضوع التوكيل: {{ $proxy->extracted_data['subject_property'] }}</p>
+
+                                {{-- Raw OCR text — collapsible, for the lawyer to verify Claude got it right --}}
+                                @if ($proxy->extracted_text)
+                                    <details class="bg-gray-100 rounded border text-xs">
+                                        <summary class="cursor-pointer px-3 py-2 font-medium text-gray-700 hover:bg-gray-200 rounded">
+                                            نص الوثيقة الكامل كما قرأه المساعد (للمراجعة) — انقر للعرض
+                                        </summary>
+                                        <div class="p-3 border-t max-h-96 overflow-y-auto whitespace-pre-wrap font-arabic leading-7" dir="rtl">{{ $proxy->extracted_text }}</div>
+                                    </details>
                                 @endif
                             </div>
                         @elseif ($proxy->extraction_status === 'failed' && $proxy->extracted_text)

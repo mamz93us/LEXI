@@ -126,6 +126,49 @@ class Form extends Component
         return $this->redirectRoute('proxies.index', navigate: true);
     }
 
+    /**
+     * Copy the AI-extracted fields into the form (and the underlying row),
+     * but only where the lawyer hasn't already entered a value. We never
+     * overwrite manual edits — the lawyer always wins.
+     */
+    public function applyExtractedData(): void
+    {
+        if (! $this->proxy || ! is_array($this->proxy->extracted_data)) {
+            return;
+        }
+
+        $proxyMeta = $this->proxy->extracted_data['proxy'] ?? [];
+
+        // notary_serial, scope, dates, type → only if the form field is empty
+        if (empty($this->notary_serial) && ! empty($proxyMeta['notary_serial'])) {
+            $this->notary_serial = (string) $proxyMeta['notary_serial'];
+        }
+        if (empty($this->scope) && ! empty($proxyMeta['scope'])) {
+            $this->scope = (string) $proxyMeta['scope'];
+        }
+        if (! empty($proxyMeta['issue_date'])) {
+            // issue_date is required on the form — always overwrite if extracted
+            // (so a freshly-uploaded scan replaces the default "today" placeholder).
+            $this->issue_date = (string) $proxyMeta['issue_date'];
+        }
+        if (empty($this->expiry_date) && ! empty($proxyMeta['expiry_date'])) {
+            $this->expiry_date = (string) $proxyMeta['expiry_date'];
+        }
+        if (in_array($proxyMeta['type'] ?? null, ['general', 'specific'], true)) {
+            $this->type = $proxyMeta['type'];
+        }
+
+        // Persist the field changes immediately so the next page render shows
+        // the updated values (without requiring the lawyer to click Save).
+        $this->proxy->update([
+            'notary_serial' => $this->notary_serial,
+            'scope' => $this->scope,
+            'issue_date' => $this->issue_date,
+            'expiry_date' => $this->expiry_date ?: null,
+            'type' => $this->type,
+        ]);
+    }
+
     private function storeUploadAndQueueExtraction(Proxy $proxy): void
     {
         // Per-tenant prefix so a future bucket-level audit stays clean.
