@@ -19,10 +19,16 @@ class User extends Authenticatable
     protected $fillable = [
         'tenant_id',
         'name',
+        'name_ar',
         'email',
         'password',
         'role',
         'phone',
+        'national_id',
+        'bar_association_no',
+        'nationality',
+        'address',
+        'is_active',
         'locale',
     ];
 
@@ -37,6 +43,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'role' => UserRole::class,
+            'is_active' => 'boolean',
         ];
     }
 
@@ -55,29 +62,36 @@ class User extends Authenticatable
         return $this->tenant_id === null;
     }
 
+    public function canManageUsers(): bool
+    {
+        return in_array($this->role, [UserRole::Partner, UserRole::Admin], true);
+    }
+
     /**
      * Map this firm lawyer into the predefined party-field schema so they
      * can stand in for a Client when used as the agent (الوكيل) on a
-     * توكيل. Only fields the User model actually carries are populated;
-     * the rest stay null and the AI sees missing data so it can prompt
-     * the lawyer to fill in (or use [...] placeholders in the draft).
+     * توكيل. Identity fields that are populated on the user row map
+     * directly; anything blank stays null so the AI prompt knows it
+     * still needs filling.
      *
      * @return array<string, string|null>
      */
     public function toAiVariables(): array
     {
         return [
-            'name' => $this->name,
+            'name' => $this->name_ar ?: $this->name,
             'name_en' => $this->name,
-            'national_id' => null,
+            'national_id' => $this->national_id,
             'commercial_register_no' => null,
-            'address' => null,
+            'address' => $this->address,
             'phone' => $this->phone,
             'whatsapp' => null,
             'email' => $this->email,
-            'nationality' => 'مصري',
+            'nationality' => $this->nationality ?: 'مصري',
             'religion' => null,
-            'profession' => 'محامٍ',
+            'profession' => 'محامٍ'.($this->bar_association_no
+                ? ' (نقابة المحامين رقم '.$this->bar_association_no.')'
+                : ''),
             'date_of_birth' => null,
             'type' => 'lawyer',
         ];

@@ -36,6 +36,8 @@ use App\Livewire\Templates\Form as TemplateForm;
 use App\Livewire\Templates\Index as TemplatesIndex;
 use App\Livewire\TimeEntries\Form as TimeEntryForm;
 use App\Livewire\TimeEntries\Index as TimeEntriesIndex;
+use App\Livewire\Users\Form as UserForm;
+use App\Livewire\Users\Index as UsersIndex;
 use App\Models\DocumentVersion;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
@@ -102,6 +104,11 @@ Route::middleware([
         Route::get('clauses', ClausesIndex::class)->name('clauses.index');
         Route::get('clauses/new', ClauseForm::class)->name('clauses.create');
         Route::get('clauses/{clause}/edit', ClauseForm::class)->name('clauses.edit');
+
+        // --- Users / firm staff ---
+        Route::get('users', UsersIndex::class)->name('users.index');
+        Route::get('users/new', UserForm::class)->name('users.create');
+        Route::get('users/{user}/edit', UserForm::class)->name('users.edit');
 
         // --- AI drafter ---
         Route::get('ai-drafter', AiDrafterIndex::class)->name('ai-drafter.index');
