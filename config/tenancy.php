@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Models\Tenant;
 use Stancl\Tenancy\Bootstrappers\CacheTenancyBootstrapper;
-use Stancl\Tenancy\Bootstrappers\FilesystemTenancyBootstrapper;
 use Stancl\Tenancy\Database\Models\Domain;
 
 return [
@@ -31,9 +30,18 @@ return [
     // --- Bootstrappers ---------------------------------------------------
     // Single-DB mode: no DatabaseTenancyBootstrapper. We use our own
     // BelongsToTenant trait + global scope to filter queries by tenant_id.
+    //
+    // NOT enabling FilesystemTenancyBootstrapper: it rewrites
+    // `storage_path()` to inject `tenant<id>/` after `/storage/`, which
+    // breaks Laravel's real-time facade cache (it tries to write to
+    // `storage/tenantXYZ/framework/cache/` — a directory that doesn't
+    // exist) and breaks file uploads end-to-end. Our isolation is per-row
+    // (tenant_id + BelongsToTenant global scope) plus manual per-tenant
+    // prefixing in upload code (e.g. `proxies/{tenant_id}/...`). When we
+    // get to S3 in Phase 2, we'll prefix at the disk level explicitly
+    // rather than via the bootstrapper.
     'bootstrappers' => [
         CacheTenancyBootstrapper::class,
-        FilesystemTenancyBootstrapper::class,
     ],
 
     // --- Cache tagging ---------------------------------------------------
