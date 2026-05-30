@@ -16,7 +16,12 @@ return [
     | real Arabic firm contracts (see docs/DECISIONS.md).
     */
     'embeddings' => [
-        'driver' => env('EMBEDDINGS_DRIVER', 'null'),
+        // NB: `.env` value `EMBEDDINGS_DRIVER=null` is parsed by Laravel as
+        // PHP null (env() converts the literal "null"/"true"/"false"/"empty"
+        // tokens), which would make the driver unresolvable. The `?:` coerces
+        // null/empty back to the string 'null' so the NullEmbeddingDriver
+        // always resolves. Set EMBEDDINGS_DRIVER=cohere for real retrieval.
+        'driver' => env('EMBEDDINGS_DRIVER') ?: 'null',
         'model' => env('EMBEDDINGS_MODEL', 'embed-multilingual-v3.0'),
         'dimension' => (int) env('EMBEDDINGS_DIMENSION', 1024),
         'api_key' => env('EMBEDDINGS_API_KEY'),

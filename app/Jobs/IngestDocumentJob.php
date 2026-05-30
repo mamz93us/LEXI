@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Jobs\Concerns\InitialisesTenantFromRow;
 use App\Models\ContractEmbedding;
+use App\Models\Document;
 use App\Models\DocumentVersion;
 use App\Services\Arabic\LegalChunker;
 use App\Services\Documents\DocumentTextExtractor;
@@ -47,25 +48,37 @@ final class IngestDocumentJob implements ShouldQueue
 
     public function __construct(public readonly int $documentVersionId) {}
 
-    public function handle(
-        DocumentTextExtractor $extractor,
-        LegalChunker $chunker,
-        EmbeddingDriverManager $embeddings,
-    ): void {
-        $version = DocumentVersion::withoutGlobalScopes()
-            ->with('document')
-            ->find($this->documentVersionId);
-
-        if (! $version || ! $version->document || ! $version->storage_ref) {
+    public function handle(): void
+    {
+        // Load the version WITHOUT eager-loading `document` — eager-loading
+        // it here would apply Document's BelongsToTenant global scope while
+        // no tenant is initialised yet (the Horizon worker starts tenant-
+        // less), throwing "No active tenant context". Initialise tenancy
+        // from the version's own tenant_id FIRST, then load the document.
+        $version = DocumentVersion::withoutGlobalScopes()->find($this->documentVersionId);
+        if (! $version || ! $version->storage_ref) {
             return;
         }
 
-        $document = $version->document;
-        $this->initialiseTenant($document->tenant_id);
+        $this->initialiseTenant($version->tenant_id);
 
+        $document = Document::withoutGlobalScopes()->find($version->document_id);
+        if (! $document) {
+            return;
+        }
+
+        // Mark ingesting up-front so ANY subsequent failure (including a
+        // service that can't be resolved) is recorded as `failed` with a
+        // reason, never left stuck on `pending`.
         $document->update(['ingestion_status' => 'ingesting', 'ingestion_note' => null]);
 
         try {
+            // Resolve heavy deps inside the try so a misconfigured driver /
+            // missing key surfaces as a visible failure, not a silent crash.
+            $extractor = app(DocumentTextExtractor::class);
+            $chunker = app(LegalChunker::class);
+            $embeddings = app(EmbeddingDriverManager::class);
+
             $text = $extractor->extract($version->storage_ref);
 
             if (trim($text) === '') {
@@ -176,9 +189,17 @@ final class IngestDocumentJob implements ShouldQueue
 
     public function failed(Throwable $e): void
     {
-        $version = DocumentVersion::withoutGlobalScopes()->with('document')->find($this->documentVersionId);
-        if ($version?->document && $version->document->ingestion_status !== 'failed') {
-            $version->document->update([
+        // `with('document')` eager-loads under withoutGlobalScopes, but to
+        // be safe re-init the tenant so the Document scope doesn't throw.
+        $version = DocumentVersion::withoutGlobalScopes()->find($this->documentVersionId);
+        if (! $version) {
+            return;
+        }
+        $this->initialiseTenant($version->tenant_id);
+
+        $document = Document::withoutGlobalScopes()->find($version->document_id);
+        if ($document && $document->ingestion_status !== 'failed') {
+            $document->update([
                 'ingestion_status' => 'failed',
                 'ingestion_note' => Str::limit($e->getMessage(), 300),
             ]);
