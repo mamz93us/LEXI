@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Livewire\Documents;
 
 use App\Jobs\IngestDocumentJob;
+use App\Models\ContractEmbedding;
 use App\Models\Document;
 use App\Models\DocumentVersion;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -64,6 +67,34 @@ class Detail extends Component
 
         $this->reset('newVersionFile');
         $this->document->refresh()->load('versions.createdBy');
+    }
+
+    /**
+     * The embedded chunks produced by the RAG ingestion pipeline. Shown
+     * to the lawyer so they can verify the document was indexed sensibly
+     * (right kind: preamble/article/signature, recognisable text).
+     *
+     * @return Collection<int, ContractEmbedding>
+     */
+    #[Computed]
+    public function chunks(): Collection
+    {
+        return ContractEmbedding::query()
+            ->where('document_id', $this->document->id)
+            ->orderBy('chunk_index')
+            ->get(['id', 'chunk_index', 'chunk_text', 'metadata']);
+    }
+
+    /** Re-queue ingestion for the current version. */
+    public function reindex(): void
+    {
+        if (! $this->document->currentVersion) {
+            return;
+        }
+        $this->document->update(['ingestion_status' => 'pending', 'ingestion_note' => null]);
+        IngestDocumentJob::dispatch($this->document->currentVersion->id);
+        unset($this->chunks);
+        $this->document->refresh();
     }
 
     public function lockVersion(int $versionId): void
