@@ -7,6 +7,7 @@ use App\Livewire\AiDrafter\Detail as AiDrafterDetail;
 use App\Livewire\AiDrafter\Index as AiDrafterIndex;
 use App\Livewire\AiDrafter\QuickDraft;
 use App\Livewire\AiDrafter\Wizard as AiDrafterWizard;
+use App\Livewire\Audit\Index;
 use App\Livewire\Calendar\Index as CalendarIndex;
 use App\Livewire\Cases\Detail as CaseDetail;
 use App\Livewire\Cases\Form as CaseForm;
@@ -108,6 +109,9 @@ Route::middleware([
         Route::get('clauses', ClausesIndex::class)->name('clauses.index');
         Route::get('clauses/new', ClauseForm::class)->name('clauses.create');
         Route::get('clauses/{clause}/edit', ClauseForm::class)->name('clauses.edit');
+
+        // --- Audit trail (partner/admin only — enforced in the component) ---
+        Route::get('audit', Index::class)->name('audit.index');
 
         // --- Users / firm staff ---
         Route::get('users', UsersIndex::class)->name('users.index');
