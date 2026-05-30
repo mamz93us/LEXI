@@ -50,6 +50,14 @@ final class IngestDocumentJob implements ShouldQueue
 
     public function handle(): void
     {
+        // Vision OCR of a multi-page PDF base64-encodes several MB, holds the
+        // full Claude response, then chunks + embeds — comfortably past PHP's
+        // default 128M on a lean worker. An OOM fatal bypasses the catch
+        // block (it's not a Throwable), leaving the row stuck on `ingesting`.
+        // Raise the ceiling for this job so failures surface as caught
+        // exceptions with a reason instead of a silent SIGKILL.
+        @ini_set('memory_limit', '512M');
+
         // Load the version WITHOUT eager-loading `document` — eager-loading
         // it here would apply Document's BelongsToTenant global scope while
         // no tenant is initialised yet (the Horizon worker starts tenant-

@@ -116,7 +116,11 @@ return [
             'maxProcesses' => 1,
             'maxTime' => 0,
             'maxJobs' => 0,
-            'memory' => 128,
+            // Memory threshold (MB) at which the worker gracefully restarts
+            // BETWEEN jobs. Vision-OCR ingestion + embedding is memory-heavy,
+            // so give headroom; the per-job ini_set('memory_limit') in
+            // IngestDocumentJob is the hard ceiling during a job.
+            'memory' => 512,
             'tries' => 1,
             'timeout' => 360,
             'nice' => 0,
