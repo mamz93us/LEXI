@@ -38,9 +38,11 @@
                                 <td class="px-6 py-3 text-sm text-gray-500">{{ strtoupper($company->legal_form) }}</td>
                                 <td class="px-6 py-3 text-sm text-gray-500">{{ $company->commercial_register_no ?? '—' }}</td>
                                 <td class="px-6 py-3 text-sm text-gray-500">{{ $company->pending_steps_count }}</td>
-                                <td class="px-6 py-3 text-end text-sm">
+                                <td class="px-6 py-3 text-end text-sm whitespace-nowrap">
+                                    <a href="{{ route('companies.show', $company) }}" wire:navigate
+                                       class="text-lexa-600 hover:text-lexa-800">المساهمون والتأسيس</a>
                                     <a href="{{ route('companies.edit', $company) }}" wire:navigate
-                                       class="text-lexa-600 hover:text-lexa-800">{{ __('Edit') }}</a>
+                                       class="text-gray-500 hover:text-gray-700 ms-2">{{ __('Edit') }}</a>
                                 </td>
                             </tr>
                         @endforeach

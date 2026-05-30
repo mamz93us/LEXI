@@ -16,6 +16,7 @@ use App\Livewire\Clauses\Form as ClauseForm;
 use App\Livewire\Clauses\Index as ClausesIndex;
 use App\Livewire\Clients\Form as ClientForm;
 use App\Livewire\Clients\Index as ClientsIndex;
+use App\Livewire\Companies\Detail;
 use App\Livewire\Companies\Form as CompanyForm;
 use App\Livewire\Companies\Index as CompaniesIndex;
 use App\Livewire\Compliance\Form as ComplianceForm;
@@ -132,6 +133,7 @@ Route::middleware([
         // --- Companies (already wired) + nested compliance + IP + serials ---
         Route::get('companies', CompaniesIndex::class)->name('companies.index');
         Route::get('companies/new', CompanyForm::class)->name('companies.create');
+        Route::get('companies/{company}', Detail::class)->name('companies.show');
         Route::get('companies/{company}/edit', CompanyForm::class)->name('companies.edit');
 
         Route::get('compliance', ComplianceIndex::class)->name('compliance.index');

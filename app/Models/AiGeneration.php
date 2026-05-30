@@ -82,24 +82,44 @@ class AiGeneration extends Model
     /**
      * Full revision chain from initial → latest, in chronological order.
      *
+     * Loads the entire tree in a SINGLE query (all rows sharing this
+     * thread's root) and orders them, instead of recursively querying
+     * each node's children — the old approach issued one query per node
+     * and ran on every 2s wire:poll of the Detail page.
+     *
      * @return Collection<int, AiGeneration>
      */
     public function chain(): Collection
     {
         $root = $this->root();
-        $chain = collect([$root]);
-        $this->walkDescendants($root, $chain);
 
-        return $chain->sortBy('created_at')->values();
-    }
+        // Every revision in a thread shares the same subject + the root in
+        // its ancestry. Pull the root plus all descendants in one go by
+        // matching the subject and walking parent_ids in memory.
+        $all = static::query()
+            ->where('subject_type', $root->subject_type)
+            ->where('subject_id', $root->subject_id)
+            ->orderBy('created_at')
+            ->get();
 
-    private function walkDescendants(self $node, Collection $chain): void
-    {
-        $children = $node->revisions()->orderBy('created_at')->get();
-        foreach ($children as $child) {
-            $chain->push($child);
-            $this->walkDescendants($child, $chain);
-        }
+        // Keep only rows reachable from this root via parent_id, so two
+        // independent threads on the same subject don't bleed together.
+        $inThread = collect([$root->id => $root]);
+        // Iterate until no new descendants are added (bounded by row count).
+        do {
+            $added = false;
+            foreach ($all as $node) {
+                if ($node->parent_id
+                    && $inThread->has($node->parent_id)
+                    && ! $inThread->has($node->id)
+                ) {
+                    $inThread->put($node->id, $node);
+                    $added = true;
+                }
+            }
+        } while ($added);
+
+        return $inThread->values()->sortBy('created_at')->values();
     }
 
     /**

@@ -22,6 +22,10 @@ class ScheduleDeadlineReminders implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
+    public int $timeout = 60;
+
+    public int $tries = 3;
+
     public function __construct(public readonly int $deadlineId) {}
 
     public function handle(): void

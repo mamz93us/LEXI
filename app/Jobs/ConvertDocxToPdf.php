@@ -24,6 +24,12 @@ class ConvertDocxToPdf implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
+    /** LibreOffice headless conversion is usually fast; cap it so a hung
+     *  soffice process can't pin a worker forever. */
+    public int $timeout = 120;
+
+    public int $tries = 2;
+
     public function __construct(public readonly int $documentVersionId) {}
 
     public function handle(): void

@@ -71,7 +71,7 @@ class Invoice extends Model
     public function recalculate(): void
     {
         $subtotal = (int) $this->lines()->sum('amount_piastres');
-        $tax = (int) round($subtotal * 0.14);
+        $tax = (int) round($subtotal * (float) config('lexa.tax.vat_rate', 0.14));
         $total = $subtotal + $tax;
         $paid = (int) $this->payments()->sum('amount_piastres');
 

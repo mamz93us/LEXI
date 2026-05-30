@@ -56,4 +56,17 @@ return [
         'top_k' => (int) env('RAG_TOP_K', 8),
         'distance' => env('RAG_DISTANCE', 'cosine'), // cosine | l2 | inner
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Tax
+    |--------------------------------------------------------------------------
+    | Egyptian VAT on legal services. Stored as a fraction (0.14 = 14%).
+    | Never hardcode this in logic — invoicing reads it from here so a
+    | rate change is a one-line config edit, and a future per-tenant
+    | override can layer on top.
+    */
+    'tax' => [
+        'vat_rate' => (float) env('VAT_RATE', 0.14),
+    ],
 ];
