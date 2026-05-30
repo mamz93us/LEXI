@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Documents;
 
+use App\Jobs\IngestDocumentJob;
 use App\Models\Client;
 use App\Models\Company;
 use App\Models\Document;
@@ -134,7 +135,14 @@ class Form extends Component
             $document->update([
                 'current_version_id' => $version->id,
                 'format' => $ext,
+                'ingestion_status' => 'pending',
             ]);
+
+            // Kick off RAG ingestion: extract → normalise → chunk → embed →
+            // contract_embeddings. Runs in the background (vision OCR +
+            // embedding can take a while). The document Detail page surfaces
+            // the status.
+            IngestDocumentJob::dispatch($version->id);
         }
 
         return $this->redirectRoute('documents.show', $document, navigate: true);

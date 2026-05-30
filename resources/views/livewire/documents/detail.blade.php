@@ -9,6 +9,29 @@
                 <a href="{{ route('documents.edit', $document) }}" wire:navigate
                    class="text-sm text-lexa-700 hover:text-lexa-900">{{ __('Edit') }}</a>
             </div>
+
+            {{-- RAG ingestion status --}}
+            @if ($document->ingestion_status)
+                @php
+                    $ingest = [
+                        'pending' => ['في انتظار الفهرسة…', 'bg-blue-100 text-blue-800'],
+                        'ingesting' => ['جاري قراءة وفهرسة الوثيقة…', 'bg-blue-100 text-blue-800 animate-pulse'],
+                        'ingested' => ['تمت الفهرسة للبحث الذكي ✓ ('.$document->embedding_count.' مقطع)', 'bg-green-100 text-green-800'],
+                        'skipped' => ['لم تُفهرس', 'bg-amber-100 text-amber-800'],
+                        'failed' => ['فشلت الفهرسة', 'bg-red-100 text-red-800'],
+                    ][$document->ingestion_status] ?? null;
+                @endphp
+                @if ($ingest)
+                    <div class="mt-3 flex items-center gap-2 flex-wrap"
+                         @if (in_array($document->ingestion_status, ['pending', 'ingesting'])) wire:poll.3s @endif>
+                        <span class="text-xs px-2 py-1 rounded {{ $ingest[1] }}">{{ $ingest[0] }}</span>
+                        @if ($document->ingestion_note)
+                            <span class="text-xs text-gray-500">{{ $document->ingestion_note }}</span>
+                        @endif
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1">الوثائق المفهرسة تُستخدم كمرجع أسلوبي عند توليد مسودات جديدة (الاسترجاع الدلالي).</p>
+                @endif
+            @endif
         </div>
 
         <div class="bg-white shadow-sm rounded-lg p-6">

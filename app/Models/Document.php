@@ -27,6 +27,9 @@ class Document extends Model
         'current_version_id',
         'format',
         'ocr_text',
+        'ingestion_status',
+        'embedding_count',
+        'ingestion_note',
     ];
 
     public function versions(): HasMany

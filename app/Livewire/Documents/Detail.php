@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Documents;
 
+use App\Jobs\IngestDocumentJob;
 use App\Models\Document;
 use App\Models\DocumentVersion;
 use Illuminate\Contracts\View\View;
@@ -24,6 +25,8 @@ class Detail extends Component
     public function mount(Document $document): void
     {
         $this->document = $document->load('versions.createdBy');
+        // Audit the read of this privileged document (§7).
+        $this->document->recordView();
     }
 
     public function uploadNewVersion(): void
@@ -53,7 +56,11 @@ class Detail extends Component
         $this->document->update([
             'current_version_id' => $version->id,
             'format' => $ext,
+            'ingestion_status' => 'pending',
         ]);
+
+        // Re-ingest into the RAG store for the new version.
+        IngestDocumentJob::dispatch($version->id);
 
         $this->reset('newVersionFile');
         $this->document->refresh()->load('versions.createdBy');
@@ -68,6 +75,11 @@ class Detail extends Component
 
     public function render(): View
     {
+        // Keep ingestion status fresh while wire:poll is active.
+        if (in_array($this->document->ingestion_status, ['pending', 'ingesting'], true)) {
+            $this->document->refresh();
+        }
+
         return view('livewire.documents.detail');
     }
 }
