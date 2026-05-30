@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\InitialisesTenantFromRow;
 use App\Models\AiGeneration;
-use App\Models\Tenant;
 use App\Services\Ai\AnthropicClient;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -37,6 +37,7 @@ use Throwable;
 final class RunAiGenerationJob implements ShouldQueue
 {
     use Dispatchable;
+    use InitialisesTenantFromRow;
     use InteractsWithQueue;
     use Queueable;
     use SerializesModels;
@@ -73,13 +74,10 @@ final class RunAiGenerationJob implements ShouldQueue
         }
 
         // Re-enter the originating tenant so settings & relationship lookups
-        // (e.g. anthropic_api_key, model) resolve to the right firm.
-        if (! tenant() && $gen->tenant_id) {
-            $tenant = Tenant::find($gen->tenant_id);
-            if ($tenant) {
-                tenancy()->initialize($tenant);
-            }
-        }
+        // (e.g. anthropic_api_key, model) resolve to the right firm — even if
+        // a warm worker still has a DIFFERENT tenant initialised from the
+        // previous job.
+        $this->initialiseTenant($gen->tenant_id);
 
         $gen->update(['status' => 'generating']);
 

@@ -54,7 +54,9 @@ class Form extends Component
             $this->client_id = $proxy->client_id;
             $this->type = $proxy->type;
             $this->notary_serial = $proxy->notary_serial;
-            $this->issue_date = $proxy->issue_date->toDateString();
+            // issue_date can be null on a proxy created purely from a file
+            // upload before extraction fills it — guard the deref.
+            $this->issue_date = $proxy->issue_date?->toDateString() ?? now()->toDateString();
             $this->expiry_date = $proxy->expiry_date?->toDateString();
             $this->scope = $proxy->scope;
             $this->status = $proxy->status;
@@ -74,7 +76,7 @@ class Form extends Component
     #[Computed]
     public function lawyers()
     {
-        return User::query()->orderBy('name')->get();
+        return User::query()->forCurrentTenant()->orderBy('name')->get();
     }
 
     #[Computed]
@@ -85,8 +87,14 @@ class Form extends Component
 
     protected function rules(): array
     {
+        // `exists` queries the table directly, bypassing the Eloquent
+        // global tenant scope — so scope each rule to the current tenant
+        // explicitly, otherwise a crafted request could attach another
+        // firm's client / lawyer / case as an FK.
+        $tenantId = tenant('id');
+
         return [
-            'client_id' => ['required', 'exists:clients,id'],
+            'client_id' => ['required', Rule::exists('clients', 'id')->where('tenant_id', $tenantId)],
             'type' => ['required', Rule::in(['general', 'specific'])],
             'notary_serial' => ['nullable', 'string', 'max:64'],
             'issue_date' => ['required', 'date'],
@@ -94,9 +102,9 @@ class Form extends Component
             'scope' => ['nullable', 'string', 'max:5000'],
             'status' => ['required', Rule::in(['valid', 'expiring', 'expired', 'revoked'])],
             'lawyer_ids' => ['array'],
-            'lawyer_ids.*' => ['integer', 'exists:users,id'],
+            'lawyer_ids.*' => ['integer', Rule::exists('users', 'id')->where('tenant_id', $tenantId)],
             'case_ids' => ['array'],
-            'case_ids.*' => ['integer', 'exists:cases,id'],
+            'case_ids.*' => ['integer', Rule::exists('cases', 'id')->where('tenant_id', $tenantId)],
             // 50 MB max — scanned multi-page توكيلات from الشهر العقاري
             // can run 20-30+ MB at decent OCR quality.
             'upload' => ['nullable', 'file', 'max:51200', 'mimes:pdf,jpg,jpeg,png,webp'],

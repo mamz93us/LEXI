@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\InitialisesTenantFromRow;
 use App\Models\Proxy;
-use App\Models\Tenant;
 use App\Services\Proxies\ProxyDataExtractor;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -29,6 +29,7 @@ use Throwable;
 final class ExtractProxyDataJob implements ShouldQueue
 {
     use Dispatchable;
+    use InitialisesTenantFromRow;
     use InteractsWithQueue;
     use Queueable;
     use SerializesModels;
@@ -47,12 +48,9 @@ final class ExtractProxyDataJob implements ShouldQueue
             return;
         }
 
-        if (! tenant() && $proxy->tenant_id) {
-            $tenant = Tenant::find($proxy->tenant_id);
-            if ($tenant) {
-                tenancy()->initialize($tenant);
-            }
-        }
+        // Force the correct tenant even if a warm worker still has a
+        // different one initialised from the previous job.
+        $this->initialiseTenant($proxy->tenant_id);
 
         $proxy->update(['extraction_status' => 'extracting']);
 

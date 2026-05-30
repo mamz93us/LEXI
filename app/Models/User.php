@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\UserRole;
 use Database\Factories\UserFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -50,6 +51,24 @@ class User extends Authenticatable
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    /**
+     * Restrict a query to users belonging to the currently-initialised
+     * tenant. The User model deliberately does NOT use BelongsToTenant
+     * (it's the auth model + can be a tenant-less landlord account), so
+     * any staff-management query MUST call this explicitly to avoid
+     * leaking / mutating users across firms.
+     */
+    public function scopeForCurrentTenant(Builder $query): Builder
+    {
+        return $query->where('tenant_id', tenant('id'));
+    }
+
+    /** True if this user belongs to the currently-active tenant. */
+    public function belongsToCurrentTenant(): bool
+    {
+        return $this->tenant_id !== null && $this->tenant_id === tenant('id');
     }
 
     public function isPartner(): bool

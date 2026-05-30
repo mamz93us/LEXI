@@ -126,6 +126,7 @@ class QuickDraft extends Component
     public function lawyersList(): Collection
     {
         return User::query()
+            ->forCurrentTenant()
             ->orderBy('name')
             ->get(['id', 'name', 'email', 'phone']);
     }

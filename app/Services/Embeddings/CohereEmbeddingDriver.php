@@ -25,10 +25,20 @@ final class CohereEmbeddingDriver implements EmbeddingDriver
 
     public function embed(string $text): array
     {
-        return $this->embedBatch([$text])[0];
+        // The single-text path is the RETRIEVAL/query path. Cohere v3
+        // requires `search_query` here — using `search_document` (the
+        // ingestion type) for queries measurably degrades recall because
+        // the two input types map into different sub-spaces.
+        return $this->embedBatch([$text], 'search_query')[0];
     }
 
-    public function embedBatch(array $texts): array
+    /**
+     * @param  array<int, string>  $texts
+     * @param  'search_document'|'search_query'  $inputType  ingestion uses
+     *                                                       'search_document' (the default); the query path passes
+     *                                                       'search_query'.
+     */
+    public function embedBatch(array $texts, string $inputType = 'search_document'): array
     {
         $this->assertConfigured();
 
@@ -39,7 +49,7 @@ final class CohereEmbeddingDriver implements EmbeddingDriver
             ])
             ->post('https://api.cohere.ai/v1/embed', [
                 'model' => $this->model,
-                'input_type' => 'search_document',
+                'input_type' => $inputType,
                 'texts' => array_values($texts),
             ]);
 

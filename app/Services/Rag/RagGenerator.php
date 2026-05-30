@@ -184,11 +184,25 @@ final class RagGenerator
         $root = $gen->root();
         $prompt = $root->prompt ?? '';
         $pos = strpos($prompt, "\n\n---\n\n");
-        if ($pos === false) {
-            return '';
+        if ($pos !== false) {
+            $system = trim(substr($prompt, 0, $pos));
+            if ($system !== '') {
+                return $system;
+            }
         }
 
-        return substr($prompt, 0, $pos);
+        // Fallback: the root prompt was a manual-edit (no system block) or
+        // an unexpected format. We MUST NOT send Claude an empty system
+        // prompt — that drops the "never fabricate article numbers /
+        // statutory citations" guardrail (CLAUDE.md §6.3). Re-assemble the
+        // canonical from-scratch system prompt instead.
+        return $this->assembler->assemble(
+            userIntent: '',
+            retrievedChunks: collect(),
+            verbatimClauses: collect(),
+            filledData: [],
+            template: null,
+        )['system'];
     }
 
     private function extractUserMessage(AiGeneration $gen): string

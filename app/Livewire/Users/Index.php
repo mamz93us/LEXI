@@ -30,7 +30,7 @@ class Index extends Component
     public function users(): Collection
     {
         $q = User::query()
-            ->whereNotNull('tenant_id')   // exclude any landlord/super-admin
+            ->forCurrentTenant()          // staff of THIS firm only
             ->orderBy('is_active', 'desc')
             ->orderBy('name');
 

@@ -5,8 +5,17 @@ use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
 Route::middleware('guest')->group(function () {
-    Volt::route('register', 'pages.auth.register')
-        ->name('register');
+    // Public self-registration is DISABLED. LEXA is single-firm in
+    // production; the stock Breeze register flow created users with
+    // tenant_id = NULL (which the app treats as a landlord/super-admin),
+    // letting anyone self-provision an unscoped account. New staff are
+    // added by a partner/admin via the in-app Users screen (/users),
+    // which stamps the correct tenant_id.
+    //
+    // To re-enable a controlled signup later (landlord-domain firm
+    // onboarding that creates a Tenant + first partner), build a dedicated
+    // component that sets tenant_id explicitly — do NOT just uncomment this.
+    // Volt::route('register', 'pages.auth.register')->name('register');
 
     Volt::route('login', 'pages.auth.login')
         ->name('login');

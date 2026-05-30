@@ -25,6 +25,10 @@ class UserPolicy
 
     public function view(User $actor, User $target): bool
     {
+        if (! $this->sameTenant($actor, $target)) {
+            return false;
+        }
+
         return $actor->canManageUsers() || $actor->id === $target->id;
     }
 
@@ -35,14 +39,21 @@ class UserPolicy
 
     public function update(User $actor, User $target): bool
     {
+        if (! $this->sameTenant($actor, $target)) {
+            return false;
+        }
+
         return $actor->canManageUsers() || $actor->id === $target->id;
     }
 
     /**
-     * Deactivate (soft) — only managers, and never yourself.
+     * Deactivate (soft) — only managers, same tenant, never yourself.
      */
     public function deactivate(User $actor, User $target): bool
     {
+        if (! $this->sameTenant($actor, $target)) {
+            return false;
+        }
         if ($actor->id === $target->id) {
             return false;
         }
@@ -59,5 +70,17 @@ class UserPolicy
         }
 
         return $actor->canManageUsers();
+    }
+
+    /**
+     * Both users must belong to the same (non-null) tenant. Blocks a
+     * partner in Firm A from acting on a user in Firm B by guessing
+     * the integer id — the User model has no global tenant scope, so
+     * this is the enforcement point.
+     */
+    private function sameTenant(User $actor, User $target): bool
+    {
+        return $actor->tenant_id !== null
+            && $actor->tenant_id === $target->tenant_id;
     }
 }
