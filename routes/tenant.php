@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\EnsureUserIsStaff;
 use App\Livewire\AiDrafter\Detail as AiDrafterDetail;
 use App\Livewire\AiDrafter\Index as AiDrafterIndex;
+use App\Livewire\AiDrafter\QuickDraft;
 use App\Livewire\AiDrafter\Wizard as AiDrafterWizard;
 use App\Livewire\Calendar\Index as CalendarIndex;
 use App\Livewire\Cases\Detail as CaseDetail;
@@ -57,14 +59,16 @@ Route::middleware([
     })->name('tenant.root');
 
     Route::get('dashboard', DashboardIndex::class)
-        ->middleware(['auth', 'verified'])
+        ->middleware(['auth', 'verified', EnsureUserIsStaff::class])
         ->name('dashboard');
 
+    // Profile stays accessible to any authenticated tenant user (incl. a
+    // future client-portal account editing their own profile).
     Route::view('profile', 'profile')
         ->middleware(['auth'])
         ->name('profile');
 
-    Route::middleware(['auth'])->group(function () {
+    Route::middleware(['auth', EnsureUserIsStaff::class])->group(function () {
         // --- Clients ---
         Route::get('clients', ClientsIndex::class)->name('clients.index');
         Route::get('clients/new', ClientForm::class)->name('clients.create');
@@ -113,7 +117,7 @@ Route::middleware([
         // --- AI drafter ---
         Route::get('ai-drafter', AiDrafterIndex::class)->name('ai-drafter.index');
         Route::get('ai-drafter/new', AiDrafterWizard::class)->name('ai-drafter.wizard');
-        Route::get('ai-drafter/quick', \App\Livewire\AiDrafter\QuickDraft::class)->name('ai-drafter.quick');
+        Route::get('ai-drafter/quick', QuickDraft::class)->name('ai-drafter.quick');
         Route::get('ai-drafter/{generation}', AiDrafterDetail::class)->name('ai-drafter.show');
 
         // --- Proxies ---
