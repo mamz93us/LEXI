@@ -167,7 +167,7 @@ final class IngestDocumentJob implements ShouldQueue
         } catch (Throwable $e) {
             $document->update([
                 'ingestion_status' => 'failed',
-                'ingestion_note' => Str::limit($e->getMessage(), 300),
+                'ingestion_note' => Str::limit($e->getMessage(), 2000),
             ]);
             throw $e;
         }
@@ -209,7 +209,7 @@ final class IngestDocumentJob implements ShouldQueue
         if ($document && $document->ingestion_status !== 'failed') {
             $document->update([
                 'ingestion_status' => 'failed',
-                'ingestion_note' => Str::limit($e->getMessage(), 300),
+                'ingestion_note' => Str::limit($e->getMessage(), 2000),
             ]);
         }
     }
